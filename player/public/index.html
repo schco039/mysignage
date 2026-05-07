@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>mySignage Player</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #000;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      cursor: none;
+    }
+
+    /* ═══════════════════════════════════════════════
+       DESIGN 1: Modern (Purple Gradient)
+       ═══════════════════════════════════════════════ */
+    #default-modern {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+      position: relative;
+      overflow: hidden;
+    }
+
+    #default-modern::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle at 30% 50%, rgba(255,255,255,0.12) 0%, transparent 50%),
+                  radial-gradient(circle at 70% 80%, rgba(255,255,255,0.08) 0%, transparent 40%);
+      animation: shimmer 15s ease-in-out infinite;
+    }
+
+    @keyframes shimmer {
+      0%, 100% { transform: translate(0, 0) rotate(0deg); }
+      33% { transform: translate(2%, -1%) rotate(1deg); }
+      66% { transform: translate(-1%, 1%) rotate(-1deg); }
+    }
+
+    #default-modern .card {
+      position: relative;
+      z-index: 1;
+      background: rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      border-radius: 24px;
+      padding: 48px 64px;
+      text-align: center;
+      box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+    }
+
+    #default-modern .logo {
+      font-size: 56px;
+      font-weight: 800;
+      margin-bottom: 8px;
+      color: #fff;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.15);
+      letter-spacing: -1px;
+    }
+
+    #default-modern .tagline {
+      font-size: 14px;
+      color: rgba(255,255,255,0.6);
+      text-transform: uppercase;
+      letter-spacing: 4px;
+      margin-bottom: 36px;
+    }
+
+    #default-modern .info-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.12);
+    }
+    #default-modern .info-row:last-child { border-bottom: none; }
+
+    #default-modern .label {
+      color: rgba(255,255,255,0.55);
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      font-weight: 500;
+    }
+
+    #default-modern .value {
+      color: #fff;
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .status-dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 8px;
+      box-shadow: 0 0 8px currentColor;
+      animation: pulse 2s infinite;
+    }
+    .status-dot.connected { background: #4ade80; color: #4ade80; }
+    .status-dot.disconnected { background: #f87171; color: #f87171; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.85); }
+    }
+
+    #default-modern .waiting {
+      position: relative;
+      z-index: 1;
+      margin-top: 32px;
+      color: rgba(255,255,255,0.7);
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .spinner {
+      width: 18px;
+      height: 18px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ═══════════════════════════════════════════════
+       DESIGN 2: Classic TV Test Pattern (Testbild)
+       ═══════════════════════════════════════════════ */
+    #default-testbild {
+      display: none;
+      width: 100%;
+      height: 100%;
+      background: #1a1a1a;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Top color bars (75% height) */
+    .tb-bars {
+      display: flex;
+      flex: 7;
+      width: 100%;
+    }
+    .tb-bars > div { flex: 1; }
+    .tb-bar-white { background: #c0c0c0; }
+    .tb-bar-yellow { background: #c0c000; }
+    .tb-bar-cyan { background: #00c0c0; }
+    .tb-bar-green { background: #00c000; }
+    .tb-bar-magenta { background: #c000c0; }
+    .tb-bar-red { background: #c00000; }
+    .tb-bar-blue { background: #0000c0; }
+
+    /* Middle narrow strip */
+    .tb-mid {
+      display: flex;
+      flex: 1;
+      width: 100%;
+    }
+    .tb-mid > div { flex: 1; }
+    .tb-mid-blue { background: #0000c0; }
+    .tb-mid-black1 { background: #131313; }
+    .tb-mid-magenta { background: #c000c0; }
+    .tb-mid-black2 { background: #131313; }
+    .tb-mid-cyan { background: #00c0c0; }
+    .tb-mid-black3 { background: #131313; }
+    .tb-mid-white { background: #c0c0c0; }
+
+    /* Bottom section */
+    .tb-bottom {
+      display: flex;
+      flex: 2;
+      width: 100%;
+    }
+    .tb-bottom-nav { background: #00214c; flex: 1.5; }
+    .tb-bottom-white { background: #fff; flex: 0.5; }
+    .tb-bottom-purple { background: #32006a; flex: 1.5; }
+    .tb-bottom-black { background: #131313; flex: 3; display: flex; align-items: center; justify-content: center; }
+    .tb-bottom-dark1 { background: #090909; flex: 0.5; }
+    .tb-bottom-dark2 { background: #1d1d1d; flex: 0.5; }
+    .tb-bottom-dark3 { background: #131313; flex: 0.5; }
+
+    /* Testbild overlay info */
+    .tb-overlay {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+    }
+
+    .tb-center-circle {
+      width: min(35vw, 35vh);
+      height: min(35vw, 35vh);
+      border: 4px solid rgba(255,255,255,0.25);
+      border-radius: 50%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,0.45);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+
+    .tb-center-circle .tb-logo {
+      font-size: clamp(20px, 4vw, 48px);
+      font-weight: 800;
+      color: #fff;
+      letter-spacing: -1px;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+    }
+
+    .tb-center-circle .tb-sub {
+      font-size: clamp(8px, 1.2vw, 14px);
+      color: rgba(255,255,255,0.5);
+      text-transform: uppercase;
+      letter-spacing: 3px;
+      margin-top: 4px;
+    }
+
+    .tb-info-bottom {
+      position: absolute;
+      bottom: 8%;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .tb-info-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: clamp(10px, 1.3vw, 16px);
+      color: rgba(255,255,255,0.7);
+      font-weight: 500;
+      text-shadow: 0 1px 6px rgba(0,0,0,0.8);
+    }
+
+    .tb-info-row .tb-val {
+      color: #fff;
+      font-weight: 700;
+    }
+
+    .tb-time {
+      position: absolute;
+      top: 5%;
+      right: 5%;
+      font-size: clamp(16px, 3vw, 40px);
+      font-weight: 300;
+      color: rgba(255,255,255,0.4);
+      font-variant-numeric: tabular-nums;
+      text-shadow: 0 1px 6px rgba(0,0,0,0.8);
+    }
+
+    /* ─── Content Display ─── */
+    #content-screen {
+      display: none;
+      width: 100%;
+      height: 100%;
+      background: #000;
+    }
+
+    #content-screen img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    #content-screen video {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    #content-screen iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+
+    .fade-in {
+      animation: fadeIn 0.8s ease-in;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Design 1: Modern -->
+  <div id="default-modern">
+    <div class="card">
+      <div class="logo">mySignage</div>
+      <div class="tagline">Digital Signage</div>
+      <div class="info">
+        <div class="info-row">
+          <span class="label">Player</span>
+          <span class="value" id="mod-name">Laden...</span>
+        </div>
+        <div class="info-row">
+          <span class="label">IP-Adresse</span>
+          <span class="value" id="mod-ip">-</span>
+        </div>
+        <div class="info-row">
+          <span class="label">Server</span>
+          <span class="value">
+            <span class="status-dot disconnected" id="mod-dot"></span>
+            <span id="mod-server">Verbinde...</span>
+          </span>
+        </div>
+      </div>
+    </div>
+    <div class="waiting">
+      <div class="spinner"></div>
+      Warte auf Inhalte...
+    </div>
+  </div>
+
+  <!-- Design 2: Testbild -->
+  <div id="default-testbild">
+    <!-- SMPTE Color Bars -->
+    <div class="tb-bars">
+      <div class="tb-bar-white"></div>
+      <div class="tb-bar-yellow"></div>
+      <div class="tb-bar-cyan"></div>
+      <div class="tb-bar-green"></div>
+      <div class="tb-bar-magenta"></div>
+      <div class="tb-bar-red"></div>
+      <div class="tb-bar-blue"></div>
+    </div>
+    <div class="tb-mid">
+      <div class="tb-mid-blue"></div>
+      <div class="tb-mid-black1"></div>
+      <div class="tb-mid-magenta"></div>
+      <div class="tb-mid-black2"></div>
+      <div class="tb-mid-cyan"></div>
+      <div class="tb-mid-black3"></div>
+      <div class="tb-mid-white"></div>
+    </div>
+    <div class="tb-bottom">
+      <div class="tb-bottom-nav"></div>
+      <div class="tb-bottom-white"></div>
+      <div class="tb-bottom-purple"></div>
+      <div class="tb-bottom-black"></div>
+      <div class="tb-bottom-dark1"></div>
+      <div class="tb-bottom-dark2"></div>
+      <div class="tb-bottom-dark3"></div>
+    </div>
+
+    <!-- Overlay -->
+    <div class="tb-overlay">
+      <div class="tb-center-circle">
+        <div class="tb-logo">mySignage</div>
+        <div class="tb-sub">Testbild</div>
+      </div>
+      <div class="tb-info-bottom">
+        <div class="tb-info-row">
+          <span class="status-dot disconnected" id="tb-dot"></span>
+          <span id="tb-name">Laden...</span>
+          <span style="color:rgba(255,255,255,0.3)">|</span>
+          <span id="tb-ip">-</span>
+          <span style="color:rgba(255,255,255,0.3)">|</span>
+          <span id="tb-server">Verbinde...</span>
+        </div>
+      </div>
+    </div>
+    <div class="tb-time" id="tb-clock"></div>
+  </div>
+
+  <!-- Content playback area -->
+  <div id="content-screen"></div>
+
+  <script>
+    const API = '/api/status';
+    let playlist = null;
+    let currentIndex = -1;
+    let playTimer = null;
+    let currentDesign = 'modern';
+
+    // ─── Clock for Testbild ─────────────────────────
+    function updateClock() {
+      const el = document.getElementById('tb-clock');
+      if (el) {
+        const now = new Date();
+        el.textContent = now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      }
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // ─── Fetch status from local player server ─────
+    async function fetchStatus() {
+      try {
+        const res = await fetch(API);
+        const data = await res.json();
+
+        // Update design preference
+        if (data.defaultScreen && data.defaultScreen !== currentDesign) {
+          currentDesign = data.defaultScreen;
+        }
+
+        updateInfo(data);
+
+        if (data.playlist && data.playlist.assets && data.playlist.assets.length > 0) {
+          if (!playlist || JSON.stringify(playlist) !== JSON.stringify(data.playlist)) {
+            playlist = data.playlist;
+            currentIndex = -1;
+            showContent();
+          }
+        } else {
+          if (playlist) {
+            playlist = null;
+            currentIndex = -1;
+            stopPlayback();
+          }
+          showDefaultScreen();
+        }
+      } catch (err) {
+        console.error('Status fetch failed:', err);
+      }
+    }
+
+    function updateInfo(data) {
+      const name = data.playerName || data.cpuSerialNumber || 'Unnamed';
+      const ip = data.ip || '-';
+      const connected = data.serverConnected;
+
+      // Modern design
+      document.getElementById('mod-name').textContent = name;
+      document.getElementById('mod-ip').textContent = ip;
+      const modDot = document.getElementById('mod-dot');
+      const modServer = document.getElementById('mod-server');
+      modDot.className = 'status-dot ' + (connected ? 'connected' : 'disconnected');
+      modServer.textContent = connected ? 'Verbunden' : 'Getrennt';
+
+      // Testbild design
+      document.getElementById('tb-name').textContent = name;
+      document.getElementById('tb-ip').textContent = ip;
+      const tbDot = document.getElementById('tb-dot');
+      tbDot.className = 'status-dot ' + (connected ? 'connected' : 'disconnected');
+      document.getElementById('tb-server').textContent = connected ? 'Verbunden' : 'Getrennt';
+    }
+
+    function showDefaultScreen() {
+      document.getElementById('content-screen').style.display = 'none';
+      if (currentDesign === 'testbild') {
+        document.getElementById('default-modern').style.display = 'none';
+        document.getElementById('default-testbild').style.display = 'flex';
+      } else {
+        document.getElementById('default-testbild').style.display = 'none';
+        document.getElementById('default-modern').style.display = 'flex';
+      }
+    }
+
+    function showContent() {
+      document.getElementById('default-modern').style.display = 'none';
+      document.getElementById('default-testbild').style.display = 'none';
+      document.getElementById('content-screen').style.display = 'block';
+      playNext();
+    }
+
+    function stopPlayback() {
+      if (playTimer) {
+        clearTimeout(playTimer);
+        playTimer = null;
+      }
+      const video = document.querySelector('#content-screen video');
+      if (video) video.pause();
+    }
+
+    // ─── Playback Loop ─────────────────────────────
+    function playNext() {
+      if (!playlist || !playlist.assets || playlist.assets.length === 0) {
+        showDefaultScreen();
+        return;
+      }
+
+      stopPlayback();
+      currentIndex = (currentIndex + 1) % playlist.assets.length;
+      const asset = playlist.assets[currentIndex];
+      const container = document.getElementById('content-screen');
+
+      container.innerHTML = '';
+
+      if (asset.type === 'video') {
+        const video = document.createElement('video');
+        video.src = `/media/${asset.filename}`;
+        video.autoplay = true;
+        video.muted = false;
+        video.playsInline = true;
+        video.className = 'fade-in';
+
+        video.onended = () => playNext();
+        video.onerror = () => {
+          console.error('Video error:', asset.filename);
+          playTimer = setTimeout(playNext, 2000);
+        };
+
+        container.appendChild(video);
+
+        if (asset.duration && asset.duration > 0) {
+          playTimer = setTimeout(playNext, asset.duration * 1000 + 500);
+        }
+
+      } else if (asset.type === 'image') {
+        const img = document.createElement('img');
+        img.src = `/media/${asset.filename}`;
+        img.className = 'fade-in';
+        img.onerror = () => {
+          console.error('Image error:', asset.filename);
+          playTimer = setTimeout(playNext, 2000);
+        };
+        container.appendChild(img);
+        playTimer = setTimeout(playNext, (asset.duration || 10) * 1000);
+
+      } else if (asset.type === 'html') {
+        const iframe = document.createElement('iframe');
+        iframe.src = `/media/${asset.filename}`;
+        iframe.className = 'fade-in';
+        container.appendChild(iframe);
+        playTimer = setTimeout(playNext, (asset.duration || 30) * 1000);
+
+      } else {
+        playTimer = setTimeout(playNext, 1000);
+      }
+    }
+
+    // ─── Init ──────────────────────────────────────
+    showDefaultScreen();
+    fetchStatus();
+    setInterval(fetchStatus, 5000);
+  </script>
+</body>
+</html>

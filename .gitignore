@@ -1,0 +1,6 @@
+node_modules/
+dist/
+server/data/sync_folders/
+server/data/media/
+server/.env
+*.log

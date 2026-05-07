@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>mySignage Test Viewer</title>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0f172a; color: #fff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; height: 100vh; overflow: hidden; }
+
+    /* ─── Setup Panel ─── */
+    #setup {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      gap: 20px;
+    }
+    #setup h1 { font-size: 28px; font-weight: 800; }
+    #setup .sub { color: #94a3b8; font-size: 13px; letter-spacing: 2px; text-transform: uppercase; }
+    #setup .form { background: #1e293b; border-radius: 16px; padding: 32px; width: 420px; max-width: 95vw; }
+    #setup label { display: block; color: #94a3b8; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; margin-top: 16px; }
+    #setup label:first-child { margin-top: 0; }
+    #setup input { width: 100%; background: #0f172a; border: 1px solid #334155; color: #fff; border-radius: 8px; padding: 10px 14px; font-size: 14px; outline: none; }
+    #setup input:focus { border-color: #6366f1; }
+    #setup .hint { color: #64748b; font-size: 11px; margin-top: 4px; }
+    #setup button { margin-top: 24px; width: 100%; padding: 12px; background: linear-gradient(135deg, #6366f1, #8b5cf6); border: none; color: #fff; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; transition: opacity 0.2s; }
+    #setup button:hover { opacity: 0.9; }
+
+    /* ─── Player View ─── */
+    #player-view {
+      display: none;
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    /* ─── Status Bar (overlay) ─── */
+    #status-bar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      background: linear-gradient(180deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.5) 70%, transparent 100%);
+      padding: 10px 16px 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 12px;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    #player-view:hover #status-bar { opacity: 1; }
+    .sb-badge { background: rgba(255,255,255,0.12); padding: 4px 10px; border-radius: 6px; display: flex; align-items: center; gap: 6px; }
+    .sb-dot { width: 7px; height: 7px; border-radius: 50%; }
+    .sb-dot.on { background: #4ade80; box-shadow: 0 0 6px #4ade80; }
+    .sb-dot.off { background: #f87171; box-shadow: 0 0 6px #f87171; }
+    .sb-label { color: #94a3b8; }
+    .sb-val { color: #fff; font-weight: 600; }
+    .sb-spacer { flex: 1; }
+    #btn-disconnect { background: rgba(239,68,68,0.2); color: #f87171; border: 1px solid rgba(239,68,68,0.3); padding: 4px 12px; border-radius: 6px; font-size: 11px; cursor: pointer; font-weight: 600; }
+    #btn-disconnect:hover { background: rgba(239,68,68,0.35); }
+
+    /* ─── Default Screen ─── */
+    #default-screen {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+      position: relative;
+      overflow: hidden;
+    }
+    #default-screen::before {
+      content: '';
+      position: absolute;
+      inset: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle at 30% 50%, rgba(255,255,255,0.12) 0%, transparent 50%),
+                  radial-gradient(circle at 70% 80%, rgba(255,255,255,0.08) 0%, transparent 40%);
+      animation: shimmer 15s ease-in-out infinite;
+    }
+    @keyframes shimmer {
+      0%, 100% { transform: translate(0, 0) rotate(0deg); }
+      33% { transform: translate(2%, -1%) rotate(1deg); }
+      66% { transform: translate(-1%, 1%) rotate(-1deg); }
+    }
+    .ds-card {
+      position: relative;
+      z-index: 1;
+      background: rgba(255,255,255,0.15);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 24px;
+      padding: 48px 64px;
+      text-align: center;
+    }
+    .ds-logo { font-size: 48px; font-weight: 800; letter-spacing: -1px; text-shadow: 0 2px 10px rgba(0,0,0,0.15); }
+    .ds-tagline { font-size: 12px; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 4px; margin-bottom: 24px; }
+    .ds-info { font-size: 14px; color: rgba(255,255,255,0.7); }
+    .ds-waiting { position: relative; z-index: 1; margin-top: 28px; color: rgba(255,255,255,0.6); font-size: 14px; display: flex; align-items: center; gap: 10px; }
+    .spinner { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ─── Content Area ─── */
+    #content-screen {
+      display: none;
+      width: 100%;
+      height: 100%;
+      background: #000;
+    }
+    #content-screen img { width: 100%; height: 100%; object-fit: contain; }
+    #content-screen video { width: 100%; height: 100%; object-fit: contain; }
+    #content-screen iframe { width: 100%; height: 100%; border: none; }
+    .fade-in { animation: fadeIn 0.6s ease-in; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    /* ─── Log Panel ─── */
+    #log-panel {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      background: rgba(0,0,0,0.9);
+      max-height: 180px;
+      overflow-y: auto;
+      padding: 8px 12px;
+      font-family: 'Cascadia Code', 'Fira Code', monospace;
+      font-size: 11px;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    #player-view:hover #log-panel { opacity: 1; }
+    .log-entry { padding: 2px 0; color: #94a3b8; }
+    .log-entry .ts { color: #475569; }
+    .log-entry.info { color: #38bdf8; }
+    .log-entry.success { color: #4ade80; }
+    .log-entry.warn { color: #fbbf24; }
+    .log-entry.error { color: #f87171; }
+
+    /* ─── Playlist Info Overlay ─── */
+    #playlist-info {
+      position: fixed;
+      bottom: 190px;
+      right: 16px;
+      z-index: 100;
+      background: rgba(0,0,0,0.8);
+      backdrop-filter: blur(10px);
+      border-radius: 12px;
+      padding: 12px 16px;
+      font-size: 12px;
+      opacity: 0;
+      transition: opacity 0.3s;
+      min-width: 200px;
+    }
+    #player-view:hover #playlist-info { opacity: 1; }
+    .pi-title { font-weight: 700; margin-bottom: 6px; color: #e2e8f0; }
+    .pi-item { padding: 3px 0; color: #94a3b8; display: flex; justify-content: space-between; gap: 12px; }
+    .pi-item.active { color: #6366f1; font-weight: 600; }
+    .pi-dur { color: #64748b; font-variant-numeric: tabular-nums; }
+  </style>
+</head>
+<body>
+
+  <!-- SETUP SCREEN -->
+  <div id="setup">
+    <h1>mySignage</h1>
+    <div class="sub">Test Viewer / Pseudo Player</div>
+    <div class="form">
+      <label>Server URL</label>
+      <input id="inp-server" type="text" value="" placeholder="http://91.98.144.84:3001">
+      <div class="hint">Die URL deines mySignage-Servers</div>
+
+      <label>Player Name</label>
+      <input id="inp-name" type="text" value="Test-Viewer" placeholder="z.B. Lobby-TV">
+      <div class="hint">Wird im Dashboard angezeigt</div>
+
+      <label>CPU Serial (Pseudo-ID)</label>
+      <input id="inp-serial" type="text" value="" placeholder="wird automatisch generiert">
+      <div class="hint">Leer lassen für zufällige ID, oder z.B. "TESTVIEWER01"</div>
+
+      <button id="btn-connect" onclick="startViewer()">Verbinden</button>
+    </div>
+  </div>
+
+  <!-- PLAYER VIEW -->
+  <div id="player-view">
+    <!-- Status bar (visible on hover) -->
+    <div id="status-bar">
+      <div class="sb-badge">
+        <span class="sb-dot off" id="sb-dot"></span>
+        <span class="sb-val" id="sb-status">Verbinde...</span>
+      </div>
+      <div class="sb-badge">
+        <span class="sb-label">Player:</span>
+        <span class="sb-val" id="sb-name">-</span>
+      </div>
+      <div class="sb-badge">
+        <span class="sb-label">Serial:</span>
+        <span class="sb-val" id="sb-serial">-</span>
+      </div>
+      <div class="sb-badge">
+        <span class="sb-label">Playlist:</span>
+        <span class="sb-val" id="sb-playlist">-</span>
+      </div>
+      <div class="sb-badge">
+        <span class="sb-label">Asset:</span>
+        <span class="sb-val" id="sb-asset">-</span>
+      </div>
+      <span class="sb-spacer"></span>
+      <button id="btn-disconnect" onclick="disconnect()">Trennen</button>
+    </div>
+
+    <!-- Default standby screen -->
+    <div id="default-screen">
+      <div class="ds-card">
+        <div class="ds-logo">mySignage</div>
+        <div class="ds-tagline">Test Viewer</div>
+        <div class="ds-info" id="ds-info">Warte auf Verbindung...</div>
+      </div>
+      <div class="ds-waiting">
+        <div class="spinner"></div>
+        Warte auf Inhalte...
+      </div>
+    </div>
+
+    <!-- Content playback -->
+    <div id="content-screen"></div>
+
+    <!-- Playlist panel (hover) -->
+    <div id="playlist-info">
+      <div class="pi-title" id="pi-title">Keine Playlist</div>
+      <div id="pi-items"></div>
+    </div>
+
+    <!-- Log panel (hover) -->
+    <div id="log-panel"></div>
+  </div>
+
+  <script>
+    // ─── State ────────────────────────────────────
+    let socket = null;
+    let serverUrl = '';
+    let playerName = '';
+    let cpuSerial = '';
+    let playlist = null;
+    let currentIndex = -1;
+    let playTimer = null;
+    let configData = null;
+
+    // ─── Persistence ─────────────────────────────
+    function loadSettings() {
+      try {
+        const s = JSON.parse(localStorage.getItem('msTestViewer') || '{}');
+        if (s.serverUrl) document.getElementById('inp-server').value = s.serverUrl;
+        if (s.playerName) document.getElementById('inp-name').value = s.playerName;
+        if (s.cpuSerial) document.getElementById('inp-serial').value = s.cpuSerial;
+      } catch {}
+    }
+
+    function saveSettings() {
+      localStorage.setItem('msTestViewer', JSON.stringify({ serverUrl, playerName, cpuSerial }));
+    }
+
+    // ─── Logging ─────────────────────────────────
+    function addLog(msg, level = '') {
+      const panel = document.getElementById('log-panel');
+      const ts = new Date().toLocaleTimeString('de-DE');
+      const div = document.createElement('div');
+      div.className = 'log-entry ' + level;
+      div.innerHTML = `<span class="ts">[${ts}]</span> ${msg}`;
+      panel.appendChild(div);
+      panel.scrollTop = panel.scrollHeight;
+      // Keep last 100 entries
+      while (panel.children.length > 100) panel.removeChild(panel.firstChild);
+    }
+
+    // ─── Start ───────────────────────────────────
+    function startViewer() {
+      serverUrl = document.getElementById('inp-server').value.trim().replace(/\/$/, '');
+      playerName = document.getElementById('inp-name').value.trim() || 'Test-Viewer';
+      cpuSerial = document.getElementById('inp-serial').value.trim() || 'TESTVWR-' + Math.random().toString(36).substring(2, 10).toUpperCase();
+
+      if (!serverUrl) { alert('Bitte Server URL eingeben!'); return; }
+
+      saveSettings();
+
+      // Switch to player view
+      document.getElementById('setup').style.display = 'none';
+      document.getElementById('player-view').style.display = 'block';
+
+      // Update UI
+      document.getElementById('sb-name').textContent = playerName;
+      document.getElementById('sb-serial').textContent = cpuSerial;
+      document.getElementById('ds-info').textContent = `${playerName} — ${cpuSerial}`;
+
+      addLog(`Starte Test Viewer: ${playerName} (${cpuSerial})`, 'info');
+      addLog(`Verbinde mit ${serverUrl}...`, 'info');
+
+      connectSocket();
+    }
+
+    // ─── Socket.IO ───────────────────────────────
+    function connectSocket() {
+      socket = io(serverUrl, {
+        path: '/newsocket.io',
+        reconnection: true,
+        reconnectionDelay: 5000,
+        transports: ['websocket', 'polling'],
+      });
+
+      socket.on('connect', () => {
+        addLog('Socket verbunden!', 'success');
+        document.getElementById('sb-dot').className = 'sb-dot on';
+        document.getElementById('sb-status').textContent = 'Verbunden';
+        sendStatus();
+      });
+
+      socket.on('disconnect', (reason) => {
+        addLog(`Socket getrennt: ${reason}`, 'warn');
+        document.getElementById('sb-dot').className = 'sb-dot off';
+        document.getElementById('sb-status').textContent = 'Getrennt';
+      });
+
+      socket.on('connect_error', (err) => {
+        addLog(`Verbindungsfehler: ${err.message}`, 'error');
+      });
+
+      // ─── Receive config from server ───
+      socket.on('config', (data) => {
+        configData = data;
+        addLog(`Config empfangen: "${data.name}" — ${data.playlists?.length || 0} Playlist(s), ${data.assets?.length || 0} Asset(s)`, 'success');
+
+        if (data.playlists && data.playlists.length > 0) {
+          const allAssets = [];
+          for (const pl of data.playlists) {
+            for (const asset of pl.assets || []) {
+              allAssets.push({
+                filename: asset.filename,
+                duration: asset.duration || 10,
+                type: asset.type || guessType(asset.filename),
+              });
+            }
+          }
+          playlist = { name: data.playlists[0].name, assets: allAssets };
+          addLog(`Playlist: "${playlist.name}" mit ${allAssets.length} Assets`, 'info');
+
+          updatePlaylistPanel();
+          currentIndex = -1;
+          showContent();
+        } else {
+          playlist = null;
+          stopPlayback();
+          showDefaultScreen();
+          addLog('Keine Playlists in Config', 'warn');
+        }
+      });
+
+      // Screenshot request
+      socket.on('snapshot', () => {
+        addLog('Screenshot angefordert (nicht unterstützt im Browser)', 'warn');
+      });
+
+      // Shell command
+      socket.on('shell', (data) => {
+        addLog(`Shell-Befehl empfangen: ${data.cmd}`, 'warn');
+        socket.emit('shell_ack', 'Test Viewer: Shell nicht unterstützt');
+      });
+
+      socket.on('cmd', (data) => {
+        addLog(`Befehl empfangen: ${JSON.stringify(data)}`, 'info');
+      });
+
+      // Status heartbeat every 60s
+      setInterval(() => {
+        if (socket && socket.connected) sendStatus();
+      }, 60000);
+    }
+
+    function sendStatus() {
+      const status = {
+        cpuSerialNumber: cpuSerial,
+        ethMac: '00:00:00:00:00:00',
+        wifiMac: '00:00:00:00:00:00',
+        myIpAddress: 'Test-Viewer',
+        version: '1.0.0-test',
+        platform_version: 'Browser-TestViewer',
+        piTemperature: '-',
+        uptime: '-',
+        diskSpaceUsed: '-',
+        diskSpaceAvailable: '-',
+        currentPlaylist: playlist?.name || '',
+        playlistOn: !!playlist,
+        tvStatus: true,
+      };
+      socket.emit('status', {}, status, 0);
+      addLog('Status gesendet', '');
+    }
+
+    function disconnect() {
+      if (socket) {
+        socket.disconnect();
+        socket = null;
+      }
+      stopPlayback();
+      playlist = null;
+      configData = null;
+      document.getElementById('player-view').style.display = 'none';
+      document.getElementById('setup').style.display = 'flex';
+      addLog('Manuell getrennt', 'warn');
+    }
+
+    // ─── Playback ────────────────────────────────
+    function showDefaultScreen() {
+      document.getElementById('content-screen').style.display = 'none';
+      document.getElementById('default-screen').style.display = 'flex';
+    }
+
+    function showContent() {
+      document.getElementById('default-screen').style.display = 'none';
+      document.getElementById('content-screen').style.display = 'block';
+      playNext();
+    }
+
+    function stopPlayback() {
+      if (playTimer) { clearTimeout(playTimer); playTimer = null; }
+      const video = document.querySelector('#content-screen video');
+      if (video) video.pause();
+    }
+
+    function playNext() {
+      if (!playlist || !playlist.assets || playlist.assets.length === 0) {
+        showDefaultScreen();
+        return;
+      }
+
+      stopPlayback();
+      currentIndex = (currentIndex + 1) % playlist.assets.length;
+      const asset = playlist.assets[currentIndex];
+      const container = document.getElementById('content-screen');
+      container.innerHTML = '';
+
+      // Media URL — load directly from server
+      const mediaUrl = `${serverUrl}/media/${asset.filename}`;
+
+      addLog(`Spiele: ${asset.filename} (${asset.type}, ${asset.duration}s)`, 'info');
+      document.getElementById('sb-asset').textContent = `${currentIndex + 1}/${playlist.assets.length} — ${asset.filename}`;
+      document.getElementById('sb-playlist').textContent = playlist.name;
+      updatePlaylistPanel();
+
+      if (asset.type === 'video') {
+        const video = document.createElement('video');
+        video.src = mediaUrl;
+        video.autoplay = true;
+        video.muted = false;
+        video.playsInline = true;
+        video.className = 'fade-in';
+        video.crossOrigin = 'anonymous';
+        video.onended = () => playNext();
+        video.onerror = () => {
+          addLog(`Video-Fehler: ${asset.filename}`, 'error');
+          playTimer = setTimeout(playNext, 2000);
+        };
+        container.appendChild(video);
+        // Fallback timeout for videos
+        if (asset.duration > 0) {
+          playTimer = setTimeout(playNext, asset.duration * 1000 + 500);
+        }
+
+      } else if (asset.type === 'image') {
+        const img = document.createElement('img');
+        img.src = mediaUrl;
+        img.className = 'fade-in';
+        img.crossOrigin = 'anonymous';
+        img.onerror = () => {
+          addLog(`Bild-Fehler: ${asset.filename}`, 'error');
+          playTimer = setTimeout(playNext, 2000);
+        };
+        container.appendChild(img);
+        playTimer = setTimeout(playNext, (asset.duration || 10) * 1000);
+
+      } else if (asset.type === 'html') {
+        const iframe = document.createElement('iframe');
+        iframe.src = mediaUrl;
+        iframe.className = 'fade-in';
+        container.appendChild(iframe);
+        playTimer = setTimeout(playNext, (asset.duration || 30) * 1000);
+
+      } else if (asset.type === 'pdf') {
+        const iframe = document.createElement('iframe');
+        iframe.src = mediaUrl;
+        iframe.className = 'fade-in';
+        container.appendChild(iframe);
+        playTimer = setTimeout(playNext, (asset.duration || 15) * 1000);
+
+      } else {
+        addLog(`Unbekannter Typ: ${asset.type} — überspringe`, 'warn');
+        playTimer = setTimeout(playNext, 1000);
+      }
+    }
+
+    function guessType(filename) {
+      const ext = filename.split('.').pop().toLowerCase();
+      if (['mp4', 'webm', 'mkv', 'avi', 'mov'].includes(ext)) return 'video';
+      if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'].includes(ext)) return 'image';
+      if (['html', 'htm'].includes(ext)) return 'html';
+      if (ext === 'pdf') return 'pdf';
+      return 'other';
+    }
+
+    // ─── Playlist Panel ─────────────────────────
+    function updatePlaylistPanel() {
+      const title = document.getElementById('pi-title');
+      const items = document.getElementById('pi-items');
+      if (!playlist || !playlist.assets.length) {
+        title.textContent = 'Keine Playlist';
+        items.innerHTML = '';
+        return;
+      }
+      title.textContent = playlist.name;
+      items.innerHTML = playlist.assets.map((a, i) => {
+        const active = i === currentIndex ? ' active' : '';
+        const name = a.filename.length > 30 ? '...' + a.filename.slice(-27) : a.filename;
+        return `<div class="pi-item${active}"><span>${i === currentIndex ? '▶ ' : ''}${name}</span><span class="pi-dur">${a.duration}s</span></div>`;
+      }).join('');
+    }
+
+    // ─── Init ────────────────────────────────────
+    loadSettings();
+
+    // Auto-connect if URL params provided
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('server')) {
+      document.getElementById('inp-server').value = urlParams.get('server');
+      if (urlParams.get('name')) document.getElementById('inp-name').value = urlParams.get('name');
+      if (urlParams.get('serial')) document.getElementById('inp-serial').value = urlParams.get('serial');
+      if (urlParams.get('auto') === '1') startViewer();
+    }
+  </script>
+</body>
+</html>

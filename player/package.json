@@ -1,0 +1,13 @@
+{
+  "name": "mysignage-player",
+  "version": "1.0.0",
+  "description": "mySignage Raspberry Pi Player",
+  "main": "player.js",
+  "scripts": {
+    "start": "node player.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "socket.io-client": "^4.7.5"
+  }
+}
