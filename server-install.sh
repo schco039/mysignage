@@ -116,6 +116,25 @@ pm2 start ecosystem.config.js
 pm2 save
 pm2 startup systemd -u root --hp /root | tail -1 | bash || true
 
+# Warten bis Server bereit ist (max 30s)
+echo "  Warte auf Server..."
+for i in $(seq 1 30); do
+  curl -s http://localhost:3001/api/v1/auth/login >/dev/null 2>&1 && break
+  sleep 1
+done
+
+# Admin-User anlegen falls DB leer
+USER_COUNT=$(mongosh mysignage --eval 'db.users.countDocuments()' --quiet 2>/dev/null | tail -1)
+if [ "$USER_COUNT" = "0" ] || [ -z "$USER_COUNT" ]; then
+  echo "  Admin-User anlegen..."
+  curl -s -X POST http://localhost:3001/api/v1/auth/register \
+    -H "Content-Type: application/json" \
+    -d '{"username":"admin","email":"admin@mysignage.local","password":"admin"}' >/dev/null
+  echo "  Admin-User angelegt (admin / admin)"
+else
+  echo "  User bereits vorhanden — übersprungen"
+fi
+
 echo ""
 echo "==========================================="
 echo "  mySignage Installation abgeschlossen!"
