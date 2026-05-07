@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Camera, RotateCcw, Terminal, Tv, Pencil, Check, X, Plus, Trash2, Send, Image, Video, FileText, Globe, GripVertical } from 'lucide-react';
+import { Camera, RotateCcw, Terminal, Tv, Pencil, Check, X, Plus, Trash2, Send, Image, Video, FileText, Globe } from 'lucide-react';
 import { useState } from 'react';
 import api from '../api/client';
 import useAuth from '../hooks/useAuth';
@@ -15,15 +15,16 @@ const typeIcons = {
 export default function Players() {
   const queryClient = useQueryClient();
   const { isAdmin } = useAuth();
+
   const { data: players = [], isLoading } = useQuery({
     queryKey: ['players'],
     queryFn: () => api.get('/players').then((r) => r.data),
     refetchInterval: 10000,
   });
 
-  const { data: displayGroups = [] } = useQuery({
-    queryKey: ['displayGroups'],
-    queryFn: () => api.get('/display-groups').then((r) => r.data),
+  const { data: userGroups = [] } = useQuery({
+    queryKey: ['userGroups'],
+    queryFn: () => api.get('/user-groups').then((r) => r.data),
   });
 
   const { data: allAssets = [] } = useQuery({
@@ -43,10 +44,8 @@ export default function Players() {
   });
 
   const deployPlayer = useMutation({
-    mutationFn: (id) => api.post(`/players/${id}/deploy`),
-    onSuccess: (_, id) => {
-      queryClient.invalidateQueries({ queryKey: ['players'] });
-    },
+    mutationFn: (id) => api.post(`/players/${id}/deploy-direct`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['players'] }),
     onError: (err) => alert(err.response?.data?.error || 'Deploy failed'),
   });
 
@@ -54,7 +53,7 @@ export default function Players() {
   const [editingName, setEditingName] = useState(null);
   const [nameInput, setNameInput] = useState('');
   const [screenshotUrl, setScreenshotUrl] = useState({});
-  const [assetPicker, setAssetPicker] = useState(null); // playerId or null
+  const [assetPicker, setAssetPicker] = useState(null);
 
   const sendAction = async (id, action) => {
     await api.post(`/players/${id}/${action}`);
@@ -85,11 +84,21 @@ export default function Players() {
     setEditingName(null);
   };
 
+  const toggleUserGroup = (playerId, groupId, currentGroups) => {
+    const ids = currentGroups.map((g) => (typeof g === 'object' ? g._id : g));
+    const next = ids.includes(groupId)
+      ? ids.filter((id) => id !== groupId)
+      : [...ids, groupId];
+    updatePlayer.mutate({ id: playerId, data: { userGroups: next } });
+  };
+
   const addDirectAsset = (playerId, asset) => {
     const player = players.find((p) => p._id === playerId);
     const current = player?.directAssets || [];
-    const newAssets = [...current, { asset: asset._id, duration: asset.duration || 10 }];
-    updatePlayer.mutate({ id: playerId, data: { directAssets: newAssets } });
+    updatePlayer.mutate({
+      id: playerId,
+      data: { directAssets: [...current, { asset: asset._id, duration: asset.duration || 10 }] },
+    });
   };
 
   const removeDirectAsset = (playerId, index) => {
@@ -106,9 +115,7 @@ export default function Players() {
     updatePlayer.mutate({ id: playerId, data: { directAssets: newAssets } });
   };
 
-  const getAssetInfo = (assetId) => {
-    return allAssets.find((a) => a._id === assetId) || null;
-  };
+  const getAssetInfo = (assetId) => allAssets.find((a) => a._id === assetId) || null;
 
   if (isLoading) return <div className="text-gray-500">Loading...</div>;
 
@@ -118,18 +125,24 @@ export default function Players() {
 
       {players.length === 0 ? (
         <div className="card p-8 text-center text-gray-500">
-          No players registered yet. Connect a player to see it here.
+          Noch keine Player registriert. Verbinde einen Player um ihn hier zu sehen.
         </div>
       ) : (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
           {players.map((player) => {
-            const ssUrl = screenshotUrl[player._id] ||
-              (player.cpuSerialNumber ? `/media/_screenshots/${player.cpuSerialNumber}.png` : null);
+            const ssUrl =
+              screenshotUrl[player._id] ||
+              (player.cpuSerialNumber
+                ? `/media/_screenshots/${player.cpuSerialNumber}.png`
+                : null);
             const directAssets = player.directAssets || [];
+            const playerGroupIds = (player.userGroups || []).map((g) =>
+              typeof g === 'object' ? g._id : g
+            );
 
             return (
               <div key={player._id} className="card p-4">
-                {/* Header with name */}
+                {/* Header */}
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2 flex-1 min-w-0">
                     <span
@@ -146,7 +159,6 @@ export default function Players() {
                           onKeyDown={(e) => e.key === 'Enter' && saveName(player._id)}
                           className="border rounded px-2 py-0.5 text-sm flex-1 min-w-0"
                           autoFocus
-                          placeholder="Player name"
                         />
                         <button onClick={() => saveName(player._id)} className="text-green-600 hover:text-green-700">
                           <Check size={16} />
@@ -163,7 +175,6 @@ export default function Players() {
                         <button
                           onClick={() => startEditName(player)}
                           className="text-gray-300 hover:text-gray-600 shrink-0"
-                          title="Rename"
                         >
                           <Pencil size={14} />
                         </button>
@@ -178,8 +189,7 @@ export default function Players() {
                           if (confirm(`Player "${player.name || player.cpuSerialNumber}" wirklich löschen?`))
                             deletePlayer.mutate(player._id);
                         }}
-                        className="p-1 text-gray-300 hover:text-red-500 transition-colors"
-                        title="Player löschen"
+                        className="p-1 text-gray-300 hover:text-red-500"
                       >
                         <Trash2 size={14} />
                       </button>
@@ -201,56 +211,64 @@ export default function Players() {
 
                 {/* Info */}
                 <div className="text-sm text-gray-600 space-y-1 mb-3">
-                  {player.name && (
-                    <div className="text-xs text-gray-400">{player.cpuSerialNumber}</div>
-                  )}
+                  {player.name && <div className="text-xs text-gray-400">{player.cpuSerialNumber}</div>}
                   <div>IP: {player.myIpAddress || player.ip || '-'}</div>
                   <div>Temp: {player.piTemperature || '-'}</div>
                   <div>Disk: {player.diskSpaceUsed || '-'} / {player.diskSpaceAvailable || '-'}</div>
                   <div>Playlist: {player.currentPlaylist || '-'}</div>
                 </div>
 
-                {/* Settings row */}
-                <div className="mb-3 grid grid-cols-2 gap-2">
-                  <select
-                    value={player.displayGroup?._id || ''}
-                    onChange={(e) => {
-                      const dg = displayGroups.find((g) => g._id === e.target.value);
-                      updatePlayer.mutate({
-                        id: player._id,
-                        data: {
-                          displayGroup: dg ? { _id: dg._id, name: dg.name } : null,
-                        },
-                      });
-                    }}
-                    className="input text-sm"
-                  >
-                    <option value="">No group</option>
-                    {displayGroups.map((dg) => (
-                      <option key={dg._id} value={dg._id}>
-                        {dg.name}
-                      </option>
-                    ))}
-                  </select>
+                {/* Settings */}
+                <div className="mb-3 space-y-2">
+                  {/* Standby Screen */}
                   <select
                     value={player.defaultScreen || 'modern'}
-                    onChange={(e) => {
-                      updatePlayer.mutate({
-                        id: player._id,
-                        data: { defaultScreen: e.target.value },
-                      });
-                    }}
-                    className="input text-sm"
+                    onChange={(e) =>
+                      updatePlayer.mutate({ id: player._id, data: { defaultScreen: e.target.value } })
+                    }
+                    className="input text-sm w-full"
                   >
                     <option value="modern">Standby: Modern</option>
                     <option value="testbild">Standby: Testbild</option>
                   </select>
+
+                  {/* User Groups — nur Admin kann zuweisen */}
+                  {isAdmin && (
+                    <div>
+                      <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
+                        User Groups
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {userGroups.map((ug) => {
+                          const active = playerGroupIds.includes(ug._id);
+                          return (
+                            <button
+                              key={ug._id}
+                              onClick={() => toggleUserGroup(player._id, ug._id, player.userGroups || [])}
+                              className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
+                                active
+                                  ? 'bg-brand-500 text-white'
+                                  : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                              }`}
+                            >
+                              {ug.name}
+                            </button>
+                          );
+                        })}
+                        {userGroups.length === 0 && (
+                          <span className="text-xs text-gray-400">Keine User Groups vorhanden</span>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Direct Assets */}
                 <div className="mb-3">
                   <div className="flex items-center justify-between mb-2">
-                    <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Direct Assets</h4>
+                    <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                      Direct Assets
+                    </h4>
                     <div className="flex gap-1">
                       <button
                         onClick={() => setAssetPicker(assetPicker === player._id ? null : player._id)}
@@ -270,21 +288,17 @@ export default function Players() {
                     </div>
                   </div>
 
-                  {/* Asset picker dropdown */}
                   {assetPicker === player._id && (
                     <div className="mb-2 border rounded-lg max-h-48 overflow-y-auto bg-white shadow-sm">
                       {allAssets.length === 0 ? (
-                        <div className="p-3 text-xs text-gray-400 text-center">No assets available</div>
+                        <div className="p-3 text-xs text-gray-400 text-center">Keine Assets</div>
                       ) : (
                         allAssets.map((asset) => {
                           const Icon = typeIcons[asset.type] || FileText;
                           return (
                             <div
                               key={asset._id}
-                              onClick={() => {
-                                addDirectAsset(player._id, asset);
-                                setAssetPicker(null);
-                              }}
+                              onClick={() => { addDirectAsset(player._id, asset); setAssetPicker(null); }}
                               className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer text-sm"
                             >
                               <div className="w-10 h-7 bg-gray-100 rounded flex items-center justify-center overflow-hidden shrink-0">
@@ -296,9 +310,6 @@ export default function Players() {
                               </div>
                               <span className="truncate flex-1">{asset.originalName}</span>
                               <span className="text-xs text-gray-400">{asset.type}</span>
-                              {asset.type === 'video' && asset.duration > 0 && (
-                                <span className="text-xs text-gray-400">{asset.duration}s</span>
-                              )}
                             </div>
                           );
                         })
@@ -306,7 +317,6 @@ export default function Players() {
                     </div>
                   )}
 
-                  {/* Assigned assets list */}
                   {directAssets.length > 0 ? (
                     <div className="space-y-1">
                       {directAssets.map((da, idx) => {
@@ -321,13 +331,13 @@ export default function Players() {
                                 <Icon size={12} className="text-gray-400" />
                               )}
                             </div>
-                            <span className="text-xs truncate flex-1">
-                              {asset?.originalName || 'Unknown'}
-                            </span>
+                            <span className="text-xs truncate flex-1">{asset?.originalName || 'Unknown'}</span>
                             <input
                               type="number"
                               value={da.duration || 10}
-                              onChange={(e) => updateDirectAssetDuration(player._id, idx, parseInt(e.target.value, 10) || 1)}
+                              onChange={(e) =>
+                                updateDirectAssetDuration(player._id, idx, parseInt(e.target.value, 10) || 1)
+                              }
                               className="w-14 border rounded px-1.5 py-0.5 text-xs text-center"
                               min="1"
                             />
@@ -344,7 +354,7 @@ export default function Players() {
                     </div>
                   ) : (
                     <div className="text-xs text-gray-400 text-center py-2">
-                      No direct assets. Use Add or assign via Display Group.
+                      Keine Direct Assets. Nutze den Schedule für zeitgesteuerte Inhalte.
                     </div>
                   )}
                 </div>
@@ -367,9 +377,7 @@ export default function Players() {
                           <RotateCcw size={14} /> Reboot
                         </button>
                         <button
-                          onClick={() =>
-                            api.post(`/players/${player._id}/tv-power`, { on: !player.tvStatus })
-                          }
+                          onClick={() => api.post(`/players/${player._id}/tv-power`, { on: !player.tvStatus })}
                           className="flex items-center gap-1 px-2 py-1 text-xs bg-gray-50 text-gray-600 rounded hover:bg-gray-100"
                         >
                           <Tv size={14} /> TV
@@ -379,15 +387,13 @@ export default function Players() {
                   </div>
                 )}
 
-                {/* Shell (admin only) */}
+                {/* Shell (Admin only) */}
                 {isAdmin && player.isConnected && (
                   <div className="flex gap-2">
                     <input
                       type="text"
                       value={shellInput[player._id] || ''}
-                      onChange={(e) =>
-                        setShellInput((prev) => ({ ...prev, [player._id]: e.target.value }))
-                      }
+                      onChange={(e) => setShellInput((prev) => ({ ...prev, [player._id]: e.target.value }))}
                       placeholder="Shell command..."
                       className="flex-1 border rounded px-2 py-1 text-xs"
                       onKeyDown={(e) => e.key === 'Enter' && sendShell(player._id)}

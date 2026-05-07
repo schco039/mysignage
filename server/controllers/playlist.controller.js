@@ -1,18 +1,16 @@
 const Playlist = require('../models/Playlist');
-const { deployDisplayGroup } = require('../services/deploy.service');
+const Player = require('../models/Player');
+const { deployPlayerIds } = require('../services/deploy.service');
 
 exports.list = async (req, res) => {
   try {
     let query = {};
-    if (req.allowedDisplayGroups) {
-      query.displayGroup = { $in: req.allowedDisplayGroups };
-    }
-    if (req.query.displayGroup) {
-      query.displayGroup = req.query.displayGroup;
+    // Editoren sehen nur Playlists ihrer UserGroups
+    if (req.userGroupIds) {
+      query.userGroup = { $in: req.userGroupIds };
     }
 
     const playlists = await Playlist.find(query)
-      .populate('displayGroup', 'name')
       .populate('assets.asset', 'filename originalName type thumbnail duration')
       .populate('targetPlayers', 'name cpuSerialNumber')
       .populate('userGroup', 'name')
@@ -26,19 +24,10 @@ exports.list = async (req, res) => {
 exports.get = async (req, res) => {
   try {
     const playlist = await Playlist.findById(req.params.id)
-      .populate('displayGroup', 'name')
       .populate('assets.asset', 'filename originalName type thumbnail duration mimetype')
       .populate('userGroup', 'name')
       .populate('createdBy', 'username');
     if (!playlist) return res.status(404).json({ error: 'Playlist not found' });
-
-    if (
-      req.allowedDisplayGroups &&
-      !req.allowedDisplayGroups.includes(playlist.displayGroup._id.toString())
-    ) {
-      return res.status(403).json({ error: 'No access to this playlist' });
-    }
-
     res.json(playlist);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -47,19 +36,19 @@ exports.get = async (req, res) => {
 
 exports.create = async (req, res) => {
   try {
-    const { name, displayGroup, assets, schedule, settings, userGroup, targetPlayers } = req.body;
-    if (!name || !displayGroup) {
-      return res.status(400).json({ error: 'name and displayGroup are required' });
-    }
+    const { name, assets, schedule, settings, userGroup, targetPlayers } = req.body;
+    if (!name) return res.status(400).json({ error: 'name is required' });
+
+    // Wenn kein userGroup übergeben → erste UserGroup des Editors nehmen
+    const resolvedUserGroup = userGroup || (req.userGroupIds && req.userGroupIds[0]) || null;
 
     const playlist = await Playlist.create({
       name,
-      displayGroup,
       assets: assets || [],
       schedule: schedule || {},
       settings: settings || {},
       targetPlayers: targetPlayers || [],
-      userGroup: userGroup || null,
+      userGroup: resolvedUserGroup,
       createdBy: req.user._id,
     });
 
@@ -73,13 +62,6 @@ exports.update = async (req, res) => {
   try {
     const playlist = await Playlist.findById(req.params.id);
     if (!playlist) return res.status(404).json({ error: 'Playlist not found' });
-
-    if (
-      req.allowedDisplayGroups &&
-      !req.allowedDisplayGroups.includes(playlist.displayGroup.toString())
-    ) {
-      return res.status(403).json({ error: 'No access to this playlist' });
-    }
 
     const { name, assets, schedule, settings, targetPlayers } = req.body;
     if (name !== undefined) playlist.name = name;
@@ -115,20 +97,16 @@ exports.remove = async (req, res) => {
   }
 };
 
-exports.deploy = async (req, res) => {
+// Deploy an eine Liste von Player-IDs (vom Schedule aufgerufen)
+exports.deployToPlayers = async (req, res) => {
   try {
-    const displayGroupId = req.params.displayGroupId;
-    if (
-      req.allowedDisplayGroups &&
-      !req.allowedDisplayGroups.includes(displayGroupId)
-    ) {
-      return res.status(403).json({ error: 'No access to this display group' });
-    }
-
-    const io = req.app.get('io');
     const { playerIds } = req.body || {};
-    const result = await deployDisplayGroup(displayGroupId, io, playerIds || null);
-    res.json({ message: 'Deploy successful', ...result });
+    if (!playerIds || playerIds.length === 0) {
+      return res.status(400).json({ error: 'playerIds required' });
+    }
+    const io = req.app.get('io');
+    await deployPlayerIds(playerIds, io);
+    res.json({ message: 'Deploy successful', players: playerIds.length });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

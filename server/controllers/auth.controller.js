@@ -63,3 +63,27 @@ exports.login = async (req, res) => {
 exports.me = async (req, res) => {
   res.json(req.user);
 };
+
+exports.changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'currentPassword and newPassword are required' });
+    }
+    if (newPassword.length < 4) {
+      return res.status(400).json({ error: 'Passwort muss mindestens 4 Zeichen haben' });
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user || !(await user.comparePassword(currentPassword))) {
+      return res.status(401).json({ error: 'Aktuelles Passwort falsch' });
+    }
+
+    user.passwordHash = newPassword; // pre-save hook hasht es
+    await user.save();
+
+    res.json({ message: 'Passwort geändert' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};

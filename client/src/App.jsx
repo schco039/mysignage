@@ -4,7 +4,6 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Players from './pages/Players';
-import DisplayGroups from './pages/DisplayGroups';
 import Assets from './pages/Assets';
 import Playlists from './pages/Playlists';
 import PlaylistEditor from './pages/PlaylistEditor';
@@ -26,7 +25,6 @@ export default function App() {
       >
         <Route path="/" element={<Dashboard />} />
         <Route path="/players" element={<Players />} />
-        <Route path="/display-groups" element={<DisplayGroups />} />
         <Route path="/assets" element={<Assets />} />
         <Route path="/playlists" element={<Playlists />} />
         <Route path="/playlists/:id/edit" element={<PlaylistEditor />} />

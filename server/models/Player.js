@@ -14,10 +14,14 @@ const playerSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
-    displayGroup: {
-      _id: { type: mongoose.Schema.Types.ObjectId, ref: 'DisplayGroup' },
-      name: String,
-    },
+
+    // UserGroups die Zugriff auf diesen Player haben
+    userGroups: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'UserGroup',
+      },
+    ],
 
     // Connection state
     isConnected: {

@@ -12,18 +12,18 @@ const userGroupSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
-    displayGroups: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'DisplayGroup',
-      },
-    ],
     members: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
       },
     ],
+    // TV Sleep/CEC Zeiten für alle Player dieser Gruppe
+    sleep: {
+      enable: { type: Boolean, default: false },
+      ontime: { type: String, default: '07:00' },
+      offtime: { type: String, default: '23:00' },
+    },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',

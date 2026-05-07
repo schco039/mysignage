@@ -7,11 +7,6 @@ const playlistSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
-    displayGroup: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'DisplayGroup',
-      required: true,
-    },
     assets: [
       {
         asset: { type: mongoose.Schema.Types.ObjectId, ref: 'Asset' },

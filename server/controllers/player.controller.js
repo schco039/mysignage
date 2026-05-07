@@ -1,6 +1,7 @@
 const Player = require('../models/Player');
 const Asset = require('../models/Asset');
 const { emitToPlayer } = require('../socket/emitter');
+const { deployForPlayer, deployPlayerIds } = require('../services/deploy.service');
 const fs = require('fs');
 const path = require('path');
 const config = require('../config');
@@ -8,10 +9,13 @@ const config = require('../config');
 exports.list = async (req, res) => {
   try {
     let query = {};
-    if (req.allowedDisplayGroups) {
-      query['displayGroup._id'] = { $in: req.allowedDisplayGroups };
+    // Editoren sehen nur Player ihrer UserGroups
+    if (req.userGroupIds) {
+      query.userGroups = { $in: req.userGroupIds };
     }
-    const players = await Player.find(query).sort({ lastReported: -1 });
+    const players = await Player.find(query)
+      .populate('userGroups', 'name')
+      .sort({ lastReported: -1 });
     res.json(players);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -20,7 +24,7 @@ exports.list = async (req, res) => {
 
 exports.get = async (req, res) => {
   try {
-    const player = await Player.findById(req.params.id);
+    const player = await Player.findById(req.params.id).populate('userGroups', 'name');
     if (!player) return res.status(404).json({ error: 'Player not found' });
     res.json(player);
   } catch (err) {
@@ -30,10 +34,10 @@ exports.get = async (req, res) => {
 
 exports.update = async (req, res) => {
   try {
-    const { name, displayGroup, location, TZ, note, labels, defaultScreen, directAssets } = req.body;
+    const { name, userGroups, location, TZ, note, labels, defaultScreen, directAssets } = req.body;
     const update = {};
     if (name !== undefined) update.name = name;
-    if (displayGroup !== undefined) update.displayGroup = displayGroup;
+    if (userGroups !== undefined) update.userGroups = userGroups;
     if (location !== undefined) update.location = location;
     if (TZ !== undefined) update.TZ = TZ;
     if (note !== undefined) update.note = note;
@@ -41,7 +45,8 @@ exports.update = async (req, res) => {
     if (defaultScreen !== undefined) update.defaultScreen = defaultScreen;
     if (directAssets !== undefined) update.directAssets = directAssets;
 
-    const player = await Player.findByIdAndUpdate(req.params.id, update, { new: true });
+    const player = await Player.findByIdAndUpdate(req.params.id, update, { new: true })
+      .populate('userGroups', 'name');
     if (!player) return res.status(404).json({ error: 'Player not found' });
     res.json(player);
   } catch (err) {
@@ -63,7 +68,6 @@ exports.shell = async (req, res) => {
   try {
     const { cmd } = req.body;
     if (!cmd) return res.status(400).json({ error: 'cmd is required' });
-
     const ioInstances = req.app.get('ioInstances');
     const sent = await emitToPlayer(ioInstances, req.params.id, 'shell', { cmd });
     if (!sent) return res.status(404).json({ error: 'Player not connected' });
@@ -87,9 +91,7 @@ exports.screenshot = async (req, res) => {
 exports.reboot = async (req, res) => {
   try {
     const ioInstances = req.app.get('ioInstances');
-    const sent = await emitToPlayer(ioInstances, req.params.id, 'shell', {
-      cmd: 'sudo reboot',
-    });
+    const sent = await emitToPlayer(ioInstances, req.params.id, 'shell', { cmd: 'sudo reboot' });
     if (!sent) return res.status(404).json({ error: 'Player not connected' });
     res.json({ message: 'Reboot command sent' });
   } catch (err) {
@@ -97,18 +99,31 @@ exports.reboot = async (req, res) => {
   }
 };
 
+// Deploy aus Playlists (Schedule)
 exports.deploy = async (req, res) => {
+  try {
+    const player = await Player.findById(req.params.id);
+    if (!player) return res.status(404).json({ error: 'Player not found' });
+    if (!player.isConnected) return res.status(400).json({ error: 'Player is not connected' });
+
+    const io = req.app.get('io');
+    const result = await deployForPlayer(player, io);
+    res.json({ message: 'Deployed', ...result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// Deploy Direct Assets (manuell zugewiesene Assets)
+exports.deployDirect = async (req, res) => {
   try {
     const player = await Player.findById(req.params.id).populate('directAssets.asset');
     if (!player) return res.status(404).json({ error: 'Player not found' });
     if (!player.directAssets || player.directAssets.length === 0) {
       return res.status(400).json({ error: 'No direct assets assigned to this player' });
     }
-    if (!player.isConnected) {
-      return res.status(400).json({ error: 'Player is not connected' });
-    }
+    if (!player.isConnected) return res.status(400).json({ error: 'Player is not connected' });
 
-    // Build config with direct assets as a single playlist
     const assets = player.directAssets
       .filter((da) => da.asset)
       .map((da) => ({
@@ -119,22 +134,13 @@ exports.deploy = async (req, res) => {
       }));
 
     const configPayload = {
-      name: player.name || 'Direct',
-      playlists: [
-        {
-          name: 'Direct Assets',
-          settings: { layout: '1' },
-          assets,
-        },
-      ],
+      playlists: [{ name: 'Direct Assets', settings: { layout: '1' }, assets }],
       assets: assets.map((a) => ({ filename: a.filename })),
       defaultScreen: player.defaultScreen || 'modern',
     };
 
-    // Sync files to player sync folder
     const syncPath = path.join(config.syncDir, player.cpuSerialNumber || player._id.toString());
     fs.mkdirSync(syncPath, { recursive: true });
-
     const validFiles = new Set(assets.map((a) => a.filename));
     for (const filename of validFiles) {
       const src = path.join(config.mediaDir, filename);
@@ -142,9 +148,7 @@ exports.deploy = async (req, res) => {
       if (!fs.existsSync(src) || fs.existsSync(dest)) continue;
       try { fs.linkSync(src, dest); } catch { fs.copyFileSync(src, dest); }
     }
-    // Clean old files
-    const existing = fs.readdirSync(syncPath);
-    for (const file of existing) {
+    for (const file of fs.readdirSync(syncPath)) {
       if (!validFiles.has(file)) fs.unlinkSync(path.join(syncPath, file));
     }
 

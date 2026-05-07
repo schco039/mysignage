@@ -11,7 +11,7 @@ router.post('/', rbac('Playlist', 'create'), ctrl.create);
 router.put('/:id', rbac('Playlist', 'update'), ctrl.update);
 router.delete('/:id', rbac('Playlist', 'delete'), ctrl.remove);
 
-// Deploy endpoint on display group
-router.post('/deploy/:displayGroupId', rbac('DisplayGroup', 'update'), ctrl.deploy);
+// Deploy an Player-IDs (vom Schedule aufgerufen)
+router.post('/deploy-players', rbac('Playlist', 'create'), ctrl.deployToPlayers);
 
 module.exports = router;

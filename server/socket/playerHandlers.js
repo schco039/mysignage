@@ -1,7 +1,5 @@
 const Player = require('../models/Player');
-const DisplayGroup = require('../models/DisplayGroup');
-const { buildConfigPayload } = require('../services/deploy.service');
-const Playlist = require('../models/Playlist');
+const { deployForPlayer } = require('../services/deploy.service');
 const fs = require('fs');
 const path = require('path');
 const config = require('../config');
@@ -63,35 +61,17 @@ function setupPlayerHandlers(io, transport) {
         await log('connect', `Player connected via ${transport}`, {
           player: player.name || cpuSerial,
           playerId: player._id,
-          displayGroup: player.displayGroup?.name,
           details: { ip: statusData.myIpAddress || statusData.ip, version: statusData.version },
         });
 
-        // Send config back if player has a display group
-        if (player.displayGroup && player.displayGroup._id) {
-          const displayGroup = await DisplayGroup.findById(player.displayGroup._id);
-          if (displayGroup) {
-            const playlists = await Playlist.find({
-              displayGroup: displayGroup._id,
-            })
-              .populate('assets.asset')
-              .sort({ createdAt: 1 });
+        // Config schicken — aus Playlists deployen
+        const hasPlaylists = await require('../models/Playlist').countDocuments({ targetPlayers: player._id });
 
-            const activePlaylists = playlists.map((p) => {
-              const obj = p.toObject();
-              obj.assets = obj.assets.filter((a) => a.asset != null);
-              return obj;
-            });
-            const configPayload = buildConfigPayload(
-              displayGroup,
-              activePlaylists,
-              displayGroup.deployedAssets || []
-            );
-            configPayload.defaultScreen = player.defaultScreen || 'modern';
-            socket.emit('config', configPayload);
-          }
+        if (hasPlaylists > 0) {
+          // Deploy aus Playlists (emittiert direkt auf den Socket)
+          await deployForPlayer(player, io);
         } else if (player.directAssets && player.directAssets.length > 0) {
-          // Send direct assets config
+          // Fallback: Direct Assets
           const Asset = require('../models/Asset');
           const populated = await Asset.find({
             _id: { $in: player.directAssets.map((da) => da.asset) },
@@ -111,9 +91,15 @@ function setupPlayerHandlers(io, transport) {
             });
 
           socket.emit('config', {
-            name: player.name || 'Direct',
             playlists: [{ name: 'Direct Assets', settings: { layout: '1' }, assets }],
             assets: assets.map((a) => ({ filename: a.filename })),
+            defaultScreen: player.defaultScreen || 'modern',
+          });
+        } else {
+          // Kein Content — Default Screen schicken
+          socket.emit('config', {
+            playlists: [],
+            assets: [],
             defaultScreen: player.defaultScreen || 'modern',
           });
         }
@@ -151,7 +137,6 @@ function setupPlayerHandlers(io, transport) {
           await log('download', `Asset synced: ${response.filename || JSON.stringify(response)}`, {
             player: player.name || player.cpuSerialNumber,
             playerId: player._id,
-            displayGroup: player.displayGroup?.name,
             details: response,
           });
         }
@@ -186,7 +171,6 @@ function setupPlayerHandlers(io, transport) {
           await log('disconnect', `Player disconnected (${reason})`, {
             player: player.name || player.cpuSerialNumber,
             playerId: player._id,
-            displayGroup: player.displayGroup?.name,
           });
         }
         console.log(`[${transport}] Player disconnected: ${socket.id} (${reason})`);
