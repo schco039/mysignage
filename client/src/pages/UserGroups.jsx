@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Trash2, Edit, Save, X } from 'lucide-react';
+import { Plus, Trash2, Edit, Save, X, Tv, Moon } from 'lucide-react';
 import { useState } from 'react';
 import api from '../api/client';
 
@@ -8,16 +8,11 @@ export default function UserGroups() {
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState('');
   const [editingId, setEditingId] = useState(null);
-  const [editData, setEditData] = useState({ displayGroups: [], members: [] });
+  const [editData, setEditData] = useState({ members: [], sleep: { enable: false, ontime: '07:00', offtime: '23:00' } });
 
   const { data: groups = [], isLoading } = useQuery({
     queryKey: ['userGroups'],
     queryFn: () => api.get('/user-groups').then((r) => r.data),
-  });
-
-  const { data: displayGroups = [] } = useQuery({
-    queryKey: ['displayGroups'],
-    queryFn: () => api.get('/display-groups').then((r) => r.data),
   });
 
   const { data: users = [] } = useQuery({
@@ -32,6 +27,7 @@ export default function UserGroups() {
       setShowCreate(false);
       setNewName('');
     },
+    onError: (err) => alert(err.response?.data?.error || 'Fehler beim Erstellen'),
   });
 
   const updateGroup = useMutation({
@@ -50,14 +46,12 @@ export default function UserGroups() {
   const startEdit = (group) => {
     setEditingId(group._id);
     setEditData({
-      displayGroups: group.displayGroups?.map((dg) => dg._id) || [],
       members: group.members?.map((m) => m._id) || [],
+      sleep: group.sleep || { enable: false, ontime: '07:00', offtime: '23:00' },
     });
   };
 
-  const toggleItem = (arr, id) => {
-    return arr.includes(id) ? arr.filter((x) => x !== id) : [...arr, id];
-  };
+  const toggleItem = (arr, id) => (arr.includes(id) ? arr.filter((x) => x !== id) : [...arr, id]);
 
   if (isLoading) return <div className="text-gray-500">Loading...</div>;
 
@@ -65,11 +59,8 @@ export default function UserGroups() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h2 className="page-title">User Groups</h2>
-        <button
-          onClick={() => setShowCreate(true)}
-          className="flex items-center gap-2 btn-brand"
-        >
-          <Plus size={18} /> New Group
+        <button onClick={() => setShowCreate(true)} className="flex items-center gap-2 btn-brand">
+          <Plus size={18} /> Neue Gruppe
         </button>
       </div>
 
@@ -86,22 +77,17 @@ export default function UserGroups() {
               type="text"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              placeholder="Group name"
+              placeholder="Gruppenname"
               className="flex-1 border rounded-lg px-3 py-2"
               required
             />
-            <button
-              type="submit"
-              className="btn-brand"
-            >
-              Create
-            </button>
+            <button type="submit" className="btn-brand">Erstellen</button>
             <button
               type="button"
               onClick={() => setShowCreate(false)}
               className="px-4 py-2 rounded-lg border hover:bg-gray-50"
             >
-              Cancel
+              Abbrechen
             </button>
           </form>
         </div>
@@ -116,9 +102,7 @@ export default function UserGroups() {
                 {editingId === group._id ? (
                   <>
                     <button
-                      onClick={() =>
-                        updateGroup.mutate({ id: group._id, data: editData })
-                      }
+                      onClick={() => updateGroup.mutate({ id: group._id, data: editData })}
                       className="p-1.5 text-green-600 hover:bg-green-50 rounded"
                     >
                       <Save size={18} />
@@ -140,8 +124,7 @@ export default function UserGroups() {
                     </button>
                     <button
                       onClick={() => {
-                        if (confirm('Delete this user group?'))
-                          deleteGroup.mutate(group._id);
+                        if (confirm('Diese User Group wirklich löschen?')) deleteGroup.mutate(group._id);
                       }}
                       className="p-1.5 text-red-600 hover:bg-red-50 rounded"
                     >
@@ -155,7 +138,7 @@ export default function UserGroups() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Members */}
               <div>
-                <h4 className="text-sm font-medium text-gray-500 mb-2">Members</h4>
+                <h4 className="text-sm font-medium text-gray-500 mb-2">Mitglieder</h4>
                 {editingId === group._id ? (
                   <div className="space-y-1">
                     {users.map((user) => (
@@ -164,10 +147,7 @@ export default function UserGroups() {
                           type="checkbox"
                           checked={editData.members.includes(user._id)}
                           onChange={() =>
-                            setEditData({
-                              ...editData,
-                              members: toggleItem(editData.members, user._id),
-                            })
+                            setEditData({ ...editData, members: toggleItem(editData.members, user._id) })
                           }
                         />
                         {user.username} ({user.role})
@@ -186,57 +166,87 @@ export default function UserGroups() {
                         </span>
                       ))
                     ) : (
-                      <span className="text-sm text-gray-400">No members</span>
+                      <span className="text-sm text-gray-400">Keine Mitglieder</span>
                     )}
                   </div>
                 )}
               </div>
 
-              {/* Display Groups */}
+              {/* Players (read-only — Zuweisung via Players-Seite) */}
               <div>
-                <h4 className="text-sm font-medium text-gray-500 mb-2">Display Groups</h4>
-                {editingId === group._id ? (
-                  <div className="space-y-1">
-                    {displayGroups.map((dg) => (
-                      <label key={dg._id} className="flex items-center gap-2 text-sm">
-                        <input
-                          type="checkbox"
-                          checked={editData.displayGroups.includes(dg._id)}
-                          onChange={() =>
-                            setEditData({
-                              ...editData,
-                              displayGroups: toggleItem(editData.displayGroups, dg._id),
-                            })
-                          }
-                        />
-                        {dg.name}
-                      </label>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="flex flex-wrap gap-1">
-                    {group.displayGroups?.length > 0 ? (
-                      group.displayGroups.map((dg) => (
-                        <span
-                          key={dg._id}
-                          className="px-2 py-0.5 bg-green-50 text-green-700 rounded text-xs"
-                        >
-                          {dg.name}
-                        </span>
-                      ))
-                    ) : (
-                      <span className="text-sm text-gray-400">No display groups</span>
-                    )}
+                <h4 className="text-sm font-medium text-gray-500 mb-2 flex items-center gap-1">
+                  <Tv size={14} /> Players
+                </h4>
+                <div className="flex flex-wrap gap-1">
+                  {group.players?.length > 0 ? (
+                    group.players.map((p) => (
+                      <span
+                        key={p._id}
+                        className="px-2 py-0.5 bg-green-50 text-green-700 rounded text-xs"
+                      >
+                        {p.name || p.cpuSerialNumber}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-sm text-gray-400">Keine Players (zuweisen über die Players-Seite)</span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Sleep / TV-Zeiten */}
+            {editingId === group._id && (
+              <div className="mt-4 pt-4 border-t">
+                <h4 className="text-sm font-medium text-gray-500 mb-2 flex items-center gap-1">
+                  <Moon size={14} /> TV Sleep-Zeiten
+                </h4>
+                <label className="flex items-center gap-2 text-sm mb-2">
+                  <input
+                    type="checkbox"
+                    checked={editData.sleep?.enable || false}
+                    onChange={(e) =>
+                      setEditData({
+                        ...editData,
+                        sleep: { ...editData.sleep, enable: e.target.checked },
+                      })
+                    }
+                  />
+                  Sleep aktivieren (CEC)
+                </label>
+                {editData.sleep?.enable && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">TV an ab</label>
+                      <input
+                        type="time"
+                        value={editData.sleep.ontime || '07:00'}
+                        onChange={(e) =>
+                          setEditData({ ...editData, sleep: { ...editData.sleep, ontime: e.target.value } })
+                        }
+                        className="w-full border rounded-lg px-3 py-2 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">TV aus ab</label>
+                      <input
+                        type="time"
+                        value={editData.sleep.offtime || '23:00'}
+                        onChange={(e) =>
+                          setEditData({ ...editData, sleep: { ...editData.sleep, offtime: e.target.value } })
+                        }
+                        className="w-full border rounded-lg px-3 py-2 text-sm"
+                      />
+                    </div>
                   </div>
                 )}
               </div>
-            </div>
+            )}
           </div>
         ))}
 
         {groups.length === 0 && (
           <div className="card p-8 text-center text-gray-500">
-            No user groups yet.
+            Noch keine User Groups vorhanden.
           </div>
         )}
       </div>

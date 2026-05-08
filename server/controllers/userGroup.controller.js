@@ -1,12 +1,20 @@
 const UserGroup = require('../models/UserGroup');
 const User = require('../models/User');
+const Player = require('../models/Player');
 const { invalidatePermCache } = require('../middleware/rbac');
 
 exports.list = async (req, res) => {
   try {
     const groups = await UserGroup.find()
       .populate('members', 'username email role')
-      .populate('displayGroups', 'name');
+      .lean();
+
+    // Player pro Gruppe ermitteln
+    for (const group of groups) {
+      group.players = await Player.find({ userGroups: group._id })
+        .select('name cpuSerialNumber')
+        .lean();
+    }
     res.json(groups);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -17,8 +25,11 @@ exports.get = async (req, res) => {
   try {
     const group = await UserGroup.findById(req.params.id)
       .populate('members', 'username email role')
-      .populate('displayGroups', 'name');
+      .lean();
     if (!group) return res.status(404).json({ error: 'UserGroup not found' });
+    group.players = await Player.find({ userGroups: group._id })
+      .select('name cpuSerialNumber')
+      .lean();
     res.json(group);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -27,18 +38,17 @@ exports.get = async (req, res) => {
 
 exports.create = async (req, res) => {
   try {
-    const { name, description, displayGroups, members } = req.body;
+    const { name, description, members, sleep } = req.body;
     if (!name) return res.status(400).json({ error: 'name is required' });
 
     const group = await UserGroup.create({
       name,
       description,
-      displayGroups: displayGroups || [],
       members: members || [],
+      sleep: sleep || undefined,
       createdBy: req.user._id,
     });
 
-    // Sync: add this group to each member's userGroups array
     if (members && members.length > 0) {
       await User.updateMany(
         { _id: { $in: members } },
@@ -58,7 +68,7 @@ exports.create = async (req, res) => {
 
 exports.update = async (req, res) => {
   try {
-    const { name, description, displayGroups, members } = req.body;
+    const { name, description, members, sleep } = req.body;
     const group = await UserGroup.findById(req.params.id);
     if (!group) return res.status(404).json({ error: 'UserGroup not found' });
 
@@ -66,11 +76,9 @@ exports.update = async (req, res) => {
 
     if (name !== undefined) group.name = name;
     if (description !== undefined) group.description = description;
-    if (displayGroups !== undefined) group.displayGroups = displayGroups;
+    if (sleep !== undefined) group.sleep = sleep;
     if (members !== undefined) {
       group.members = members;
-
-      // Remove group from old members not in new list
       const removed = oldMembers.filter((m) => !members.includes(m));
       if (removed.length > 0) {
         await User.updateMany(
@@ -78,7 +86,6 @@ exports.update = async (req, res) => {
           { $pull: { userGroups: group._id } }
         );
       }
-      // Add group to new members
       const added = members.filter((m) => !oldMembers.includes(m));
       if (added.length > 0) {
         await User.updateMany(
@@ -89,11 +96,14 @@ exports.update = async (req, res) => {
     }
 
     await group.save();
-    invalidatePermCache(); // clear all cached permissions
+    invalidatePermCache();
 
     const populated = await UserGroup.findById(group._id)
       .populate('members', 'username email role')
-      .populate('displayGroups', 'name');
+      .lean();
+    populated.players = await Player.find({ userGroups: group._id })
+      .select('name cpuSerialNumber')
+      .lean();
     res.json(populated);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -105,9 +115,13 @@ exports.remove = async (req, res) => {
     const group = await UserGroup.findByIdAndDelete(req.params.id);
     if (!group) return res.status(404).json({ error: 'UserGroup not found' });
 
-    // Remove group from all members
     await User.updateMany(
       { _id: { $in: group.members } },
+      { $pull: { userGroups: group._id } }
+    );
+    // Auch von Players entfernen
+    await Player.updateMany(
+      { userGroups: group._id },
       { $pull: { userGroups: group._id } }
     );
     invalidatePermCache();
