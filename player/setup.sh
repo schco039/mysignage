@@ -231,8 +231,30 @@ EOF2
   chown -R pi:pi /home/pi/.config /home/pi/.local 2>/dev/null || true
   chown -R pi:pi /home/pi/mysignage
 
-  # Auto-login to desktop (labwc session)
+  # ─── Auto-Login zum Desktop ───
+  # Versuch 1: raspi-config (sollte auf Pi OS funktionieren)
   raspi-config nonint do_boot_behaviour B4 2>/dev/null || true
+
+  # Versuch 2: lightdm direkt konfigurieren (Bookworm Backup)
+  if [ -d /etc/lightdm ]; then
+    mkdir -p /etc/lightdm/lightdm.conf.d
+    cat > /etc/lightdm/lightdm.conf.d/50-mysignage-autologin.conf << 'LIGHTDMEOF'
+[Seat:*]
+autologin-user=pi
+autologin-user-timeout=0
+LIGHTDMEOF
+  fi
+
+  # Versuch 3: Systemd autologin user setzen (falls /etc/sysconfig benutzt wird)
+  mkdir -p /etc/systemd/system/getty@tty1.service.d
+  cat > /etc/systemd/system/getty@tty1.service.d/autologin.conf << 'GETTYEOF'
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --autologin pi --noclear %I $TERM
+GETTYEOF
+
+  # Pi-User braucht "autologin" Gruppen-Mitgliedschaft
+  usermod -aG autologin pi 2>/dev/null || true
 
   # Remove any old .bash_profile X11 autostart
   sed -i '/startx\|xinit\|openbox/d' /home/pi/.bash_profile 2>/dev/null || true
