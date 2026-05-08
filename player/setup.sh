@@ -239,6 +239,13 @@ EOF2
   fi
   echo "  Autologin-Session: ${AUTOLOGIN_SESSION:-(none)}"
 
+  # Pi OS Trixie referenziert "rpd-labwc" in /etc/lightdm/lightdm.conf,
+  # das Desktop-File fehlt aber → Symlink anlegen damit lightdm es findet
+  if [ -f /usr/share/wayland-sessions/labwc.desktop ] && [ ! -e /usr/share/wayland-sessions/rpd-labwc.desktop ]; then
+    ln -sf /usr/share/wayland-sessions/labwc.desktop /usr/share/wayland-sessions/rpd-labwc.desktop
+    echo "  Symlink rpd-labwc → labwc angelegt"
+  fi
+
   # Versuch 1: raspi-config
   raspi-config nonint do_boot_behaviour B4 2>/dev/null || true
 
