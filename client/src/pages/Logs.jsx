@@ -5,6 +5,7 @@ import {
 import { useState } from 'react';
 import api from '../api/client';
 import useAuth from '../hooks/useAuth';
+import { formatRelative } from '../utils/format';
 
 const TYPE_CONFIG = {
   deploy: { icon: Rocket, color: 'text-blue-600 bg-blue-50', label: 'Deploy' },
@@ -149,7 +150,7 @@ export default function Logs() {
                       </div>
                     </div>
                     <div className="text-xs text-gray-400 shrink-0">
-                      {formatTime(entry.createdAt)}
+                      {formatRelative(entry.createdAt)}
                     </div>
                   </div>
 
@@ -168,14 +169,3 @@ export default function Logs() {
   );
 }
 
-function formatTime(dateStr) {
-  const d = new Date(dateStr);
-  const now = new Date();
-  const isToday = d.toDateString() === now.toDateString();
-
-  if (isToday) {
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  }
-  return d.toLocaleDateString([], { day: '2-digit', month: '2-digit' }) + ' ' +
-    d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-}

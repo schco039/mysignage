@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2, Edit } from 'lucide-react';
 import { useState } from 'react';
 import api from '../api/client';
+import { formatDateTime } from '../utils/format';
 
 export default function Users() {
   const queryClient = useQueryClient();
@@ -163,9 +164,7 @@ export default function Users() {
                 <td className="p-3 text-gray-500">
                   {user.userGroups?.map((g) => g.name).join(', ') || '-'}
                 </td>
-                <td className="p-3 text-gray-500">
-                  {user.lastLogin ? new Date(user.lastLogin).toLocaleString() : '-'}
-                </td>
+                <td className="p-3 text-gray-500">{formatDateTime(user.lastLogin)}</td>
                 <td className="p-3">
                   <div className="flex gap-1">
                     <button

@@ -557,15 +557,19 @@ function CreateScheduleModal({ modal, allAssets, allPlayers, userGroups, onSave,
                   <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
                     <Clock size={11} className="inline mr-1" />Von
                   </label>
-                  <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)}
-                    className="w-full border rounded-lg px-3 py-2 text-sm" />
+                  <input
+                    type="text" inputMode="numeric" pattern="^([01]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM"
+                    value={startTime} onChange={(e) => setStartTime(e.target.value)}
+                    className="w-full border rounded-lg px-3 py-2 text-sm font-mono" />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
                     <Clock size={11} className="inline mr-1" />Bis
                   </label>
-                  <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)}
-                    className="w-full border rounded-lg px-3 py-2 text-sm" />
+                  <input
+                    type="text" inputMode="numeric" pattern="^([01]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM"
+                    value={endTime} onChange={(e) => setEndTime(e.target.value)}
+                    className="w-full border rounded-lg px-3 py-2 text-sm font-mono" />
                 </div>
               </div>
               <p className="text-xs text-gray-400">Leer = ganztägig / immer aktiv</p>
@@ -698,15 +702,19 @@ function EditScheduleModal({ playlist, allPlayers, onSave, onDelete, onClose, is
                   <label className="block text-xs font-semibold text-gray-500 mb-1">
                     <Clock size={11} className="inline mr-1" />Von
                   </label>
-                  <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)}
-                    className="w-full border rounded-lg px-3 py-2 text-sm" />
+                  <input
+                    type="text" inputMode="numeric" pattern="^([01]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM"
+                    value={startTime} onChange={(e) => setStartTime(e.target.value)}
+                    className="w-full border rounded-lg px-3 py-2 text-sm font-mono" />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 mb-1">
                     <Clock size={11} className="inline mr-1" />Bis
                   </label>
-                  <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)}
-                    className="w-full border rounded-lg px-3 py-2 text-sm" />
+                  <input
+                    type="text" inputMode="numeric" pattern="^([01]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM"
+                    value={endTime} onChange={(e) => setEndTime(e.target.value)}
+                    className="w-full border rounded-lg px-3 py-2 text-sm font-mono" />
                 </div>
               </div>
               <p className="text-xs text-gray-400">Leer = ganztägig</p>

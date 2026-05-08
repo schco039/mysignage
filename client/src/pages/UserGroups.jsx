@@ -8,7 +8,7 @@ export default function UserGroups() {
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState('');
   const [editingId, setEditingId] = useState(null);
-  const [editData, setEditData] = useState({ members: [], sleep: { enable: false, ontime: '07:00', offtime: '23:00' } });
+  const [editData, setEditData] = useState({ name: '', members: [], sleep: { enable: false, ontime: '07:00', offtime: '23:00' } });
 
   const { data: groups = [], isLoading } = useQuery({
     queryKey: ['userGroups'],
@@ -46,6 +46,7 @@ export default function UserGroups() {
   const startEdit = (group) => {
     setEditingId(group._id);
     setEditData({
+      name: group.name || '',
       members: group.members?.map((m) => m._id) || [],
       sleep: group.sleep || { enable: false, ontime: '07:00', offtime: '23:00' },
     });
@@ -97,7 +98,17 @@ export default function UserGroups() {
         {groups.map((group) => (
           <div key={group._id} className="card p-4">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold text-lg">{group.name}</h3>
+              {editingId === group._id ? (
+                <input
+                  type="text"
+                  value={editData.name}
+                  onChange={(e) => setEditData({ ...editData, name: e.target.value })}
+                  className="font-semibold text-lg border rounded-lg px-3 py-1 flex-1 mr-3"
+                  placeholder="Gruppenname"
+                />
+              ) : (
+                <h3 className="font-semibold text-lg">{group.name}</h3>
+              )}
               <div className="flex gap-1">
                 {editingId === group._id ? (
                   <>
@@ -216,25 +227,31 @@ export default function UserGroups() {
                 {editData.sleep?.enable && (
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">TV an ab</label>
+                      <label className="block text-xs text-gray-500 mb-1">TV an ab (HH:MM)</label>
                       <input
-                        type="time"
-                        value={editData.sleep.ontime || '07:00'}
+                        type="text"
+                        inputMode="numeric"
+                        pattern="^([01]?[0-9]|2[0-3]):[0-5][0-9]$"
+                        placeholder="07:00"
+                        value={editData.sleep.ontime || ''}
                         onChange={(e) =>
                           setEditData({ ...editData, sleep: { ...editData.sleep, ontime: e.target.value } })
                         }
-                        className="w-full border rounded-lg px-3 py-2 text-sm"
+                        className="w-full border rounded-lg px-3 py-2 text-sm font-mono"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">TV aus ab</label>
+                      <label className="block text-xs text-gray-500 mb-1">TV aus ab (HH:MM)</label>
                       <input
-                        type="time"
-                        value={editData.sleep.offtime || '23:00'}
+                        type="text"
+                        inputMode="numeric"
+                        pattern="^([01]?[0-9]|2[0-3]):[0-5][0-9]$"
+                        placeholder="23:00"
+                        value={editData.sleep.offtime || ''}
                         onChange={(e) =>
                           setEditData({ ...editData, sleep: { ...editData.sleep, offtime: e.target.value } })
                         }
-                        className="w-full border rounded-lg px-3 py-2 text-sm"
+                        className="w-full border rounded-lg px-3 py-2 text-sm font-mono"
                       />
                     </div>
                   </div>

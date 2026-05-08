@@ -26,6 +26,8 @@ exports.register = async (req, res) => {
       email,
       passwordHash: password, // pre-save hook hashes it
       role,
+      // Default-Admin (admin/admin) muss Passwort ändern
+      mustChangePassword: username === 'admin' && password === 'admin',
     });
 
     const token = signToken(user);
@@ -80,6 +82,7 @@ exports.changePassword = async (req, res) => {
     }
 
     user.passwordHash = newPassword; // pre-save hook hasht es
+    user.mustChangePassword = false; // Flag zurücksetzen
     await user.save();
 
     res.json({ message: 'Passwort geändert' });

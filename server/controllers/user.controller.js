@@ -31,6 +31,7 @@ exports.create = async (req, res) => {
       email,
       passwordHash: password,
       role: role || 'editor',
+      mustChangePassword: true, // neue User müssen Passwort beim ersten Login ändern
     });
     res.status(201).json(user);
   } catch (err) {

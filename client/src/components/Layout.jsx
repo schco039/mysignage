@@ -33,7 +33,7 @@ const adminItems = [
   { to: '/admin/user-groups', icon: Shield, label: 'User Groups' },
 ];
 
-function PasswordModal({ onClose }) {
+function PasswordModal({ onClose, forced = false, onSuccess }) {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -42,7 +42,11 @@ function PasswordModal({ onClose }) {
 
   const mutation = useMutation({
     mutationFn: (data) => api.put('/auth/password', data),
-    onSuccess: () => { setSuccess(true); setTimeout(onClose, 1500); },
+    onSuccess: () => {
+      setSuccess(true);
+      if (onSuccess) onSuccess();
+      setTimeout(() => onClose(), 1500);
+    },
     onError: (err) => setError(err.response?.data?.error || 'Fehler'),
   });
 
@@ -58,8 +62,17 @@ function PasswordModal({ onClose }) {
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
         <div className="flex items-center justify-between p-4 border-b">
-          <h3 className="font-semibold">Passwort ändern</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+          <div>
+            <h3 className="font-semibold">Passwort ändern</h3>
+            {forced && (
+              <p className="text-xs text-orange-600 mt-1">
+                Du musst dein Passwort beim ersten Login ändern.
+              </p>
+            )}
+          </div>
+          {!forced && (
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+          )}
         </div>
         <form onSubmit={handleSubmit} className="p-4 space-y-3">
           {success ? (
@@ -116,6 +129,14 @@ export default function Layout() {
   const { user, logout, isAdmin } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [passwordModal, setPasswordModal] = useState(false);
+  const forcedPasswordChange = !!user?.mustChangePassword;
+
+  const handlePasswordChanged = () => {
+    // User-Objekt im LocalStorage updaten
+    const updated = { ...user, mustChangePassword: false };
+    localStorage.setItem('user', JSON.stringify(updated));
+    window.location.reload();
+  };
 
   return (
     <div className="flex h-screen">
@@ -240,7 +261,13 @@ export default function Layout() {
         </main>
       </div>
 
-      {passwordModal && <PasswordModal onClose={() => setPasswordModal(false)} />}
+      {(passwordModal || forcedPasswordChange) && (
+        <PasswordModal
+          onClose={() => setPasswordModal(false)}
+          forced={forcedPasswordChange}
+          onSuccess={forcedPasswordChange ? handlePasswordChanged : undefined}
+        />
+      )}
     </div>
   );
 }

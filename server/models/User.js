@@ -33,6 +33,11 @@ const userSchema = new mongoose.Schema(
       },
     ],
     lastLogin: Date,
+    // Wenn true, muss der User beim nächsten Login das Passwort ändern
+    mustChangePassword: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true }
 );
