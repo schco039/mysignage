@@ -290,7 +290,7 @@
       position: absolute;
       inset: 0;
       opacity: 0;
-      transition: opacity 600ms ease-in-out;
+      transition: opacity 250ms ease-in-out;
       pointer-events: none;
     }
 
@@ -487,7 +487,7 @@
 
     // ─── Cross-Fade Layer-Verwaltung ───────────────
     let activeLayerId = 'layer-a';
-    const FADE_MS = 600;
+    const FADE_MS = 250;
 
     function getActiveLayer() { return document.getElementById(activeLayerId); }
     function getInactiveLayer() {
