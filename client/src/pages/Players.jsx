@@ -54,24 +54,47 @@ export default function Players() {
   const [nameInput, setNameInput] = useState('');
   const [screenshotUrl, setScreenshotUrl] = useState({});
   const [assetPicker, setAssetPicker] = useState(null);
+  const [toasts, setToasts] = useState([]);
+
+  const showToast = (message, type = 'success') => {
+    const id = Date.now() + Math.random();
+    setToasts((prev) => [...prev, { id, message, type }]);
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3500);
+  };
 
   const sendAction = async (id, action) => {
-    await api.post(`/players/${id}/${action}`);
-    if (action === 'screenshot') {
-      setTimeout(() => {
-        setScreenshotUrl((prev) => ({
-          ...prev,
-          [id]: `/media/_screenshots/${players.find((p) => p._id === id)?.cpuSerialNumber}.png?t=${Date.now()}`,
-        }));
-      }, 3000);
+    const labels = {
+      screenshot: 'Screenshot angefordert',
+      reboot: 'Neustart-Befehl gesendet',
+      'tv-power': 'TV-Power-Befehl gesendet',
+    };
+    try {
+      await api.post(`/players/${id}/${action}`);
+      showToast(labels[action] || `${action} ausgeführt`, 'success');
+      if (action === 'screenshot') {
+        setTimeout(() => {
+          setScreenshotUrl((prev) => ({
+            ...prev,
+            [id]: `/media/_screenshots/${players.find((p) => p._id === id)?.cpuSerialNumber}.png?t=${Date.now()}`,
+          }));
+          showToast('Screenshot empfangen', 'success');
+        }, 3000);
+      }
+    } catch (err) {
+      showToast(err.response?.data?.error || `${action} fehlgeschlagen`, 'error');
     }
   };
 
   const sendShell = async (id) => {
     const cmd = shellInput[id];
     if (!cmd) return;
-    await api.post(`/players/${id}/shell`, { cmd });
-    setShellInput((prev) => ({ ...prev, [id]: '' }));
+    try {
+      await api.post(`/players/${id}/shell`, { cmd });
+      showToast(`Shell-Befehl gesendet: ${cmd}`, 'success');
+      setShellInput((prev) => ({ ...prev, [id]: '' }));
+    } catch (err) {
+      showToast(err.response?.data?.error || 'Shell-Befehl fehlgeschlagen', 'error');
+    }
   };
 
   const startEditName = (player) => {
@@ -377,7 +400,14 @@ export default function Players() {
                           <RotateCcw size={14} /> Reboot
                         </button>
                         <button
-                          onClick={() => api.post(`/players/${player._id}/tv-power`, { on: !player.tvStatus })}
+                          onClick={async () => {
+                            try {
+                              await api.post(`/players/${player._id}/tv-power`, { on: !player.tvStatus });
+                              showToast(`TV ${!player.tvStatus ? 'an' : 'aus'} gesendet`, 'success');
+                            } catch (err) {
+                              showToast(err.response?.data?.error || 'TV-Befehl fehlgeschlagen', 'error');
+                            }
+                          }}
                           className="flex items-center gap-1 px-2 py-1 text-xs bg-gray-50 text-gray-600 rounded hover:bg-gray-100"
                         >
                           <Tv size={14} /> TV
@@ -411,6 +441,22 @@ export default function Players() {
           })}
         </div>
       )}
+
+      {/* Toast Notifications */}
+      <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm">
+        {toasts.map((t) => (
+          <div
+            key={t.id}
+            className={`px-4 py-3 rounded-xl shadow-lg text-sm font-medium animate-in fade-in slide-in-from-bottom-2 ${
+              t.type === 'error'
+                ? 'bg-red-500 text-white'
+                : 'bg-green-500 text-white'
+            }`}
+          >
+            {t.message}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

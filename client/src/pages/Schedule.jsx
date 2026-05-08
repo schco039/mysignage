@@ -193,6 +193,8 @@ export default function Schedule() {
             nowIndicator
             eventDisplay="block"
             dayMaxEvents={3}
+            eventTimeFormat={{ hour: '2-digit', minute: '2-digit', hour12: false }}
+            slotLabelFormat={{ hour: '2-digit', minute: '2-digit', hour12: false }}
           />
         </div>
 
