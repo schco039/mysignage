@@ -1,4 +1,6 @@
 @echo off
+setlocal enabledelayedexpansion
+
 echo.
 echo  ======================================
 echo   mySignage SD-Karte vorbereiten
@@ -21,12 +23,36 @@ if "%DRIVE%"=="" (
 )
 
 echo  [OK] Boot-Partition: %DRIVE%
+echo.
 
-REM Kopiere das Install-Script auf Boot-Partition
+REM Server-Adresse abfragen
+:askserver
+set "SERVER_HOST="
+set /p "SERVER_HOST=  Server-Adresse (IP oder Hostname): "
+if "!SERVER_HOST!"=="" (
+    echo  [FEHLER] Server-Adresse darf nicht leer sein.
+    goto :askserver
+)
+
+REM Port abfragen (Default 3001)
+set "SERVER_PORT=3001"
+set /p "SERVER_PORT=  Port [3001]: "
+if "!SERVER_PORT!"=="" set "SERVER_PORT=3001"
+
+set "SERVER_URL=http://!SERVER_HOST!:!SERVER_PORT!"
+echo.
+echo  Server-URL: !SERVER_URL!
+echo.
+
+REM Server-Config auf Boot-Partition schreiben
+> "%DRIVE%\mysignage-server.conf" echo MYSIGNAGE_SERVER=!SERVER_URL!
+echo  [OK] mysignage-server.conf geschrieben
+
+REM Install-Script auf Boot-Partition kopieren
 copy "%~dp0mysignage-firstboot.sh" "%DRIVE%\mysignage-firstboot.sh" >nul
 echo  [OK] mysignage-firstboot.sh kopiert
 
-REM Pruefe ob cloud-init (user-data) oder firstrun.sh
+REM cloud-init oder firstrun.sh
 if exist "%DRIVE%\user-data" goto :cloudinit
 if exist "%DRIVE%\firstrun.sh" goto :firstrun
 echo  [FEHLER] Weder user-data noch firstrun.sh gefunden!
@@ -38,11 +64,9 @@ exit /b 1
 :cloudinit
 echo  [OK] cloud-init erkannt (user-data)
 
-REM Pruefe ob runcmd: schon in user-data existiert
 findstr /b /c:"runcmd:" "%DRIVE%\user-data" >nul 2>&1
 if %errorlevel%==0 goto :cloudinit_append
 
-REM Kein runcmd vorhanden — neuen Block anfuegen
 >> "%DRIVE%\user-data" echo.
 >> "%DRIVE%\user-data" echo runcmd:
 >> "%DRIVE%\user-data" echo   - chmod +x /boot/firmware/mysignage-firstboot.sh
@@ -51,8 +75,6 @@ echo  [OK] user-data: runcmd Block hinzugefuegt
 goto :done
 
 :cloudinit_append
-REM runcmd existiert bereits — unsere Eintraege sicher einfuegen via PowerShell
-REM (Batch for /f zerstoert Leerzeilen und Sonderzeichen in YAML)
 powershell -Command "$f='%DRIVE%\user-data'; $c=(Get-Content $f -Raw); $insert=\"  - chmod +x /boot/firmware/mysignage-firstboot.sh`n  - /bin/bash /boot/firmware/mysignage-firstboot.sh`n\"; $c=$c -replace '(?m)^(runcmd:\s*\n)', \"`$1$insert\"; [IO.File]::WriteAllText($f, $c)"
 echo  [OK] user-data: Eintraege an bestehendes runcmd angefuegt
 goto :done
@@ -88,11 +110,14 @@ echo.
 echo  ======================================
 echo   FERTIG! SD-Karte ist bereit.
 echo.
+echo   Server: !SERVER_URL!
+echo.
 echo   1. SD-Karte sicher auswerfen
 echo   2. In Raspberry Pi stecken
 echo   3. Strom dran - ca. 10 Min warten
-echo   4. Player erscheint automatisch im
-echo      Dashboard: http://91.98.144.84:3001
+echo   4. Player erscheint im Dashboard:
+echo      !SERVER_URL!
 echo  ======================================
 echo.
 pause
+endlocal

@@ -4,14 +4,24 @@
 #
 # Macht ein frisches Raspberry Pi OS zum Signage-Player.
 #
-# Nutzung:
-#   1. Raspberry Pi OS Desktop auf SD flashen
-#   2. Pi booten, SSH aktivieren, einloggen
-#   3. Dieses Script ausfuehren:
-#      curl -sSL http://91.98.144.84:3001/setup.sh | sudo bash
+# Nutzung (manuell):
+#   curl -sSL http://<server>:3001/setup.sh | sudo bash -s http://<server>:3001
+#
+# Oder via cloud-init: prepare-sd.bat erstellt eine Config-Datei,
+# firstboot.sh liest sie und ruft dieses Script mit der URL auf.
 # ─────────────────────────────────────────────────────────
 
-SERVER_URL="${1:-http://91.98.144.84:3001}"
+# Server-URL: Argument > Config-Datei > Fehler
+SERVER_URL="${1:-}"
+if [ -z "$SERVER_URL" ] && [ -f /boot/firmware/mysignage-server.conf ]; then
+  source /boot/firmware/mysignage-server.conf
+  SERVER_URL="$MYSIGNAGE_SERVER"
+fi
+if [ -z "$SERVER_URL" ]; then
+  echo "FEHLER: Keine Server-URL angegeben!"
+  echo "Nutzung: curl -sSL <url>/setup.sh | sudo bash -s <url>"
+  exit 1
+fi
 INSTALL_DIR="/home/pi/mysignage"
 NODE_VERSION="18"
 PROGRESS_FILE="/tmp/mysignage-setup-progress"

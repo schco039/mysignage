@@ -205,6 +205,22 @@ export default function UserGroups() {
               </div>
             </div>
 
+            {/* CEC Sleep-Anzeige (außerhalb des Edit-Modus) */}
+            {editingId !== group._id && (
+              <div className="mt-3 pt-3 border-t flex items-center gap-2 text-xs">
+                <Moon size={14} className="text-gray-400" />
+                {group.sleep?.enable ? (
+                  <span className="text-gray-600">
+                    TV CEC aktiv: <span className="font-mono font-semibold">{group.sleep.ontime}</span>
+                    {' – '}
+                    <span className="font-mono font-semibold">{group.sleep.offtime}</span>
+                  </span>
+                ) : (
+                  <span className="text-gray-400">CEC Sleep deaktiviert</span>
+                )}
+              </div>
+            )}
+
             {/* Sleep / TV-Zeiten */}
             {editingId === group._id && (
               <div className="mt-4 pt-4 border-t">

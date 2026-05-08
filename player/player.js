@@ -13,9 +13,9 @@ const MEDIA_DIR = path.join(__dirname, 'media');
 const STATE_FILE = path.join(__dirname, 'state.json');
 const LOCAL_PORT = 8000;
 
-// Load or create config
+// Load config (muss von setup.sh angelegt sein)
 let config = {
-  serverUrl: 'http://91.98.144.84:3001',
+  serverUrl: '',
   playerName: '',
   localPort: LOCAL_PORT,
 };
@@ -23,6 +23,13 @@ let config = {
 if (fs.existsSync(CONFIG_FILE)) {
   Object.assign(config, JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8')));
 }
+
+if (!config.serverUrl) {
+  console.error('[Player] FEHLER: Keine serverUrl in config.json!');
+  console.error('[Player] config.json wird erwartet unter:', CONFIG_FILE);
+  process.exit(1);
+}
+
 fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
 
 // Ensure media directory
