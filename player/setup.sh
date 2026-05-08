@@ -74,7 +74,8 @@ fi
 if [ "$STEP" -lt 3 ]; then
   echo "[3/7] Chromium installieren..."
   export DEBIAN_FRONTEND=noninteractive
-  apt-get install -y -qq chromium unclutter || true
+  # unclutter (X11) + unclutter-xfixes (XFixes) + xdotool (Fallback) für Cursor-Hiding
+  apt-get install -y -qq chromium unclutter unclutter-xfixes xdotool || true
   echo "  Chromium installiert"
   set_progress 3
 fi
@@ -164,15 +165,19 @@ for i in $(seq 1 30); do
   sleep 1
 done
 
-# Hide cursor
-unclutter -idle 0 &
+export DISPLAY=:0
+
+# Cursor verstecken — drei Methoden für robustes Verhalten auf Xwayland/labwc
+sleep 2
+unclutter-xfixes --timeout 0 --fork 2>/dev/null &
+unclutter -idle 0 -root 2>/dev/null &
+xdotool mousemove 9999 9999 2>/dev/null &
 
 # Kill any old Chromium instances
 pkill -f 'chromium.*kiosk' 2>/dev/null
 sleep 1
 
 # Start Chromium via Xwayland (DISPLAY=:0 provided by labwc)
-export DISPLAY=:0
 exec chromium \
   --kiosk \
   --password-store=basic \
