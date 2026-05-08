@@ -36,13 +36,18 @@ Mit **Raspberry Pi Imager** flashen:
 
 ### Schritt 2 — SD-Karte vorbereiten
 
-SD-Karte **eingesteckt lassen**, dann auf dem Windows-PC ausführen:
+Lade beide Dateien in den **selben Ordner** auf dem Windows-PC:
 
-```
-player\prepare-sd.bat
-```
+- [prepare-sd.bat](https://raw.githubusercontent.com/schco039/mysignage/main/player/prepare-sd.bat)
+- [mysignage-firstboot.sh](https://raw.githubusercontent.com/schco039/mysignage/main/player/mysignage-firstboot.sh)
 
-Das Script findet die SD-Karte automatisch, kopiert das Setup-Script drauf und trägt es in den Autostart ein.
+SD-Karte **eingesteckt lassen**, dann `prepare-sd.bat` doppelklicken.
+
+Das Script:
+- fragt nach Server-Adresse und Port (Default 3001)
+- findet die SD-Karte automatisch
+- kopiert das Setup-Script + Config drauf
+- trägt es in cloud-init Autostart ein
 
 ### Schritt 3 — Pi booten
 
@@ -72,7 +77,26 @@ Nach dem automatischen Neustart erscheint der Player im Dashboard und zeigt den 
 SSH auf den Pi, dann:
 
 ```bash
-curl -sSL http://<server-ip>:3001/setup.sh | sudo bash
+curl -sSL http://<server>:3001/setup.sh | sudo bash -s http://<server>:3001
+```
+
+## Pi: Fortschritt überwachen
+
+Während `prepare-sd.bat` läuft, kannst du dich per SSH auf den Pi einloggen und den Live-Fortschritt mitverfolgen:
+
+```bash
+ssh pi@<pi-ip>
+sudo tail -f /var/log/mysignage-setup.log
+```
+
+Falls noch nichts im Log steht (cloud-init läuft noch nicht):
+```bash
+sudo journalctl -u cloud-init -f
+```
+
+Aktuellen Setup-Schritt anzeigen (0–7):
+```bash
+cat /tmp/mysignage-setup-progress
 ```
 
 ---
