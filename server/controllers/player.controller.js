@@ -133,13 +133,15 @@ exports.deployDirect = async (req, res) => {
         option: { filename: da.asset.filename, duration: da.duration || da.asset.duration || 10, selected: true },
       }));
 
+    const folderKey = player.cpuSerialNumber || player._id.toString();
     const configPayload = {
+      name: folderKey, // Player nutzt das als sync_folders-Pfad
       playlists: [{ name: 'Direct Assets', settings: { layout: '1' }, assets }],
       assets: assets.map((a) => ({ filename: a.filename })),
       defaultScreen: player.defaultScreen || 'modern',
     };
 
-    const syncPath = path.join(config.syncDir, player.cpuSerialNumber || player._id.toString());
+    const syncPath = path.join(config.syncDir, folderKey);
     fs.mkdirSync(syncPath, { recursive: true });
     const validFiles = new Set(assets.map((a) => a.filename));
     for (const filename of validFiles) {

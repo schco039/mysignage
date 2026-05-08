@@ -57,6 +57,7 @@ async function deployForPlayer(player, io) {
   // Config an Player schicken
   if (io && player.socket && player.isConnected) {
     const configPayload = buildConfigPayload(activePlaylists, [...validFiles].map((f) => ({ filename: f })));
+    configPayload.name = folderKey; // wichtig: Player nutzt das als sync_folders-Pfad
     configPayload.defaultScreen = player.defaultScreen || 'modern';
     io.to(player.socket).emit('config', configPayload);
   }

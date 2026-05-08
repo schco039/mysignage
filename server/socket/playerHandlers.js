@@ -90,14 +90,18 @@ function setupPlayerHandlers(io, transport) {
               };
             });
 
+          const folderKey = player.cpuSerialNumber || player._id.toString();
           socket.emit('config', {
+            name: folderKey,
             playlists: [{ name: 'Direct Assets', settings: { layout: '1' }, assets }],
             assets: assets.map((a) => ({ filename: a.filename })),
             defaultScreen: player.defaultScreen || 'modern',
           });
         } else {
           // Kein Content — Default Screen schicken
+          const folderKey = player.cpuSerialNumber || player._id.toString();
           socket.emit('config', {
+            name: folderKey,
             playlists: [],
             assets: [],
             defaultScreen: player.defaultScreen || 'modern',
