@@ -232,26 +232,35 @@ EOF2
   chown -R pi:pi /home/pi/mysignage
 
   # ─── Auto-Login zum Desktop ───
-  # Versuch 1: raspi-config (sollte auf Pi OS funktionieren)
+  # Session aus den verfügbaren Wayland-Sessions ermitteln (labwc bevorzugt)
+  AUTOLOGIN_SESSION="labwc"
+  if [ ! -f "/usr/share/wayland-sessions/${AUTOLOGIN_SESSION}.desktop" ]; then
+    AUTOLOGIN_SESSION=$(ls /usr/share/wayland-sessions/*.desktop 2>/dev/null | head -1 | xargs -I{} basename {} .desktop)
+  fi
+  echo "  Autologin-Session: ${AUTOLOGIN_SESSION:-(none)}"
+
+  # Versuch 1: raspi-config
   raspi-config nonint do_boot_behaviour B4 2>/dev/null || true
 
-  # Versuch 2: lightdm direkt konfigurieren (Bookworm Backup)
+  # Versuch 2: lightdm direkt konfigurieren (mit Session)
   if [ -d /etc/lightdm ]; then
     mkdir -p /etc/lightdm/lightdm.conf.d
-    cat > /etc/lightdm/lightdm.conf.d/50-mysignage-autologin.conf << 'LIGHTDMEOF'
+    cat > /etc/lightdm/lightdm.conf.d/50-mysignage-autologin.conf << LIGHTDMEOF
 [Seat:*]
 autologin-user=pi
 autologin-user-timeout=0
+autologin-session=${AUTOLOGIN_SESSION}
+user-session=${AUTOLOGIN_SESSION}
 LIGHTDMEOF
   fi
 
-  # Versuch 3: Systemd autologin user setzen (falls /etc/sysconfig benutzt wird)
-  mkdir -p /etc/systemd/system/getty@tty1.service.d
-  cat > /etc/systemd/system/getty@tty1.service.d/autologin.conf << 'GETTYEOF'
-[Service]
-ExecStart=
-ExecStart=-/sbin/agetty --autologin pi --noclear %I $TERM
-GETTYEOF
+  # Versuch 3: AccountsService (Pi OS Trixie nutzt das)
+  mkdir -p /var/lib/AccountsService/users
+  cat > /var/lib/AccountsService/users/pi << ACCEOF
+[User]
+Session=${AUTOLOGIN_SESSION}
+SystemAccount=false
+ACCEOF
 
   # Pi-User braucht "autologin" Gruppen-Mitgliedschaft
   usermod -aG autologin pi 2>/dev/null || true
