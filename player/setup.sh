@@ -272,6 +272,12 @@ ACCEOF
   # Pi-User braucht "autologin" Gruppen-Mitgliedschaft
   usermod -aG autologin pi 2>/dev/null || true
 
+  # NOPASSWD sudo für reboot/shutdown (damit Player das ohne Passwort kann)
+  cat > /etc/sudoers.d/050_mysignage-player << 'SUDOEOF'
+pi ALL=(ALL) NOPASSWD: /sbin/reboot, /sbin/shutdown, /usr/sbin/reboot, /usr/sbin/shutdown
+SUDOEOF
+  chmod 440 /etc/sudoers.d/050_mysignage-player
+
   # Remove any old .bash_profile X11 autostart
   sed -i '/startx\|xinit\|openbox/d' /home/pi/.bash_profile 2>/dev/null || true
 

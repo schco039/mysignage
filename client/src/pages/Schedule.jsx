@@ -28,6 +28,21 @@ function getGroupColor(groupId, groups) {
 
 const DAYS_LABELS = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
 
+// Date Helpers: ISO yyyy-mm-dd ↔ deutsches dd.mm.yyyy
+function isoToDe(iso) {
+  if (!iso) return '';
+  const [y, m, d] = iso.split('-');
+  if (!y || !m || !d) return '';
+  return `${d}.${m}.${y}`;
+}
+function deToIso(de) {
+  if (!de) return '';
+  const m = de.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+  if (!m) return '';
+  const [, d, mo, y] = m;
+  return `${y}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}`;
+}
+
 export default function Schedule() {
   const queryClient = useQueryClient();
   const [filterGroup, setFilterGroup] = useState('');
@@ -272,9 +287,10 @@ function CreateScheduleModal({ modal, allAssets, allPlayers, userGroups, onSave,
   const [selectedPlayerIds, setSelectedPlayerIds] = useState([]);
   const [filterGroup, setFilterGroup] = useState('');
   const [name, setName] = useState('');
-  const [startDate, setStartDate] = useState(modal.startDate || '');
+  // Datums-State im DEUTSCHEN Format (dd.mm.yyyy) — beim Submit zu ISO konvertiert
+  const [startDate, setStartDate] = useState(isoToDe(modal.startDate || ''));
   const [endDate, setEndDate] = useState(
-    modal.endDate ? format(new Date(new Date(modal.endDate).getTime() - 86400000), 'yyyy-MM-dd') : ''
+    modal.endDate ? isoToDe(format(new Date(new Date(modal.endDate).getTime() - 86400000), 'yyyy-MM-dd')) : ''
   );
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
@@ -321,6 +337,11 @@ function CreateScheduleModal({ modal, allAssets, allPlayers, userGroups, onSave,
     if (selectedAssets.length === 0) { alert('Bitte ein Asset auswählen'); return; }
     if (selectedPlayerIds.length === 0) { alert('Bitte mindestens einen Bildschirm auswählen'); return; }
 
+    const isoStart = deToIso(startDate);
+    const isoEnd = deToIso(endDate);
+    if (startDate && !isoStart) { alert('Startdatum hat falsches Format (TT.MM.JJJJ)'); return; }
+    if (endDate && !isoEnd) { alert('Enddatum hat falsches Format (TT.MM.JJJJ)'); return; }
+
     const autoName = name || selectedAssets[0]?.originalName || 'Schedule';
     onSave({
       name: autoName,
@@ -328,9 +349,9 @@ function CreateScheduleModal({ modal, allAssets, allPlayers, userGroups, onSave,
       assets: selectedAssets,
       targetPlayers: selectedPlayerIds,
       schedule: {
-        enabled: !!(startDate || startTime),
-        startDate: startDate || null,
-        endDate: endDate || null,
+        enabled: !!(isoStart || startTime),
+        startDate: isoStart || null,
+        endDate: isoEnd || null,
         startTime: startTime || null,
         endTime: endTime || null,
         daysOfWeek,
@@ -542,15 +563,19 @@ function CreateScheduleModal({ modal, allAssets, allPlayers, userGroups, onSave,
                   <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
                     <CalendarIcon size={11} className="inline mr-1" />Start
                   </label>
-                  <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)}
-                    className="w-full border rounded-lg px-3 py-2 text-sm" />
+                  <input
+                    type="text" inputMode="numeric" pattern="^\d{1,2}\.\d{1,2}\.\d{4}$" placeholder="TT.MM.JJJJ"
+                    value={startDate} onChange={(e) => setStartDate(e.target.value)}
+                    className="w-full border rounded-lg px-3 py-2 text-sm font-mono" />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
                     <CalendarIcon size={11} className="inline mr-1" />Ende
                   </label>
-                  <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)}
-                    className="w-full border rounded-lg px-3 py-2 text-sm" />
+                  <input
+                    type="text" inputMode="numeric" pattern="^\d{1,2}\.\d{1,2}\.\d{4}$" placeholder="TT.MM.JJJJ"
+                    value={endDate} onChange={(e) => setEndDate(e.target.value)}
+                    className="w-full border rounded-lg px-3 py-2 text-sm font-mono" />
                 </div>
               </div>
 
@@ -629,10 +654,10 @@ function EditScheduleModal({ playlist, allPlayers, onSave, onDelete, onClose, is
 
   const [enabled, setEnabled] = useState(playlist?.schedule?.enabled || false);
   const [startDate, setStartDate] = useState(
-    playlist?.schedule?.startDate ? format(new Date(playlist.schedule.startDate), 'yyyy-MM-dd') : ''
+    playlist?.schedule?.startDate ? isoToDe(format(new Date(playlist.schedule.startDate), 'yyyy-MM-dd')) : ''
   );
   const [endDate, setEndDate] = useState(
-    playlist?.schedule?.endDate ? format(new Date(playlist.schedule.endDate), 'yyyy-MM-dd') : ''
+    playlist?.schedule?.endDate ? isoToDe(format(new Date(playlist.schedule.endDate), 'yyyy-MM-dd')) : ''
   );
   const [startTime, setStartTime] = useState(playlist?.schedule?.startTime || '');
   const [endTime, setEndTime] = useState(playlist?.schedule?.endTime || '');
@@ -646,10 +671,14 @@ function EditScheduleModal({ playlist, allPlayers, onSave, onDelete, onClose, is
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    const isoStart = deToIso(startDate);
+    const isoEnd = deToIso(endDate);
+    if (startDate && !isoStart) { alert('Startdatum: TT.MM.JJJJ'); return; }
+    if (endDate && !isoEnd) { alert('Enddatum: TT.MM.JJJJ'); return; }
     onSave(playlist._id, {
       enabled,
-      startDate: startDate || null,
-      endDate: endDate || null,
+      startDate: isoStart || null,
+      endDate: isoEnd || null,
       startTime: startTime || null,
       endTime: endTime || null,
       daysOfWeek,
@@ -688,15 +717,19 @@ function EditScheduleModal({ playlist, allPlayers, onSave, onDelete, onClose, is
                   <label className="block text-xs font-semibold text-gray-500 mb-1">
                     <CalendarIcon size={11} className="inline mr-1" />Start
                   </label>
-                  <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)}
-                    className="w-full border rounded-lg px-3 py-2 text-sm" />
+                  <input
+                    type="text" inputMode="numeric" pattern="^\d{1,2}\.\d{1,2}\.\d{4}$" placeholder="TT.MM.JJJJ"
+                    value={startDate} onChange={(e) => setStartDate(e.target.value)}
+                    className="w-full border rounded-lg px-3 py-2 text-sm font-mono" />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 mb-1">
                     <CalendarIcon size={11} className="inline mr-1" />Ende
                   </label>
-                  <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)}
-                    className="w-full border rounded-lg px-3 py-2 text-sm" />
+                  <input
+                    type="text" inputMode="numeric" pattern="^\d{1,2}\.\d{1,2}\.\d{4}$" placeholder="TT.MM.JJJJ"
+                    value={endDate} onChange={(e) => setEndDate(e.target.value)}
+                    className="w-full border rounded-lg px-3 py-2 text-sm font-mono" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
