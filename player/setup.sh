@@ -11,12 +11,13 @@
 # firstboot.sh liest sie und ruft dieses Script mit der URL auf.
 # ─────────────────────────────────────────────────────────
 
-# Server-URL: Argument > Config-Datei > Fehler
+# Server-URL: Argument > Config-Datei > Fehler (CRLF-tolerant)
 SERVER_URL="${1:-}"
 if [ -z "$SERVER_URL" ] && [ -f /boot/firmware/mysignage-server.conf ]; then
-  source /boot/firmware/mysignage-server.conf
-  SERVER_URL="$MYSIGNAGE_SERVER"
+  SERVER_URL=$(grep '^MYSIGNAGE_SERVER=' /boot/firmware/mysignage-server.conf | head -1 | sed 's/^MYSIGNAGE_SERVER=//' | tr -d '\r\n[:space:]')
 fi
+# Sicherheitshalber auch \r aus dem Argument entfernen
+SERVER_URL=$(echo "$SERVER_URL" | tr -d '\r\n[:space:]')
 if [ -z "$SERVER_URL" ]; then
   echo "FEHLER: Keine Server-URL angegeben!"
   echo "Nutzung: curl -sSL <url>/setup.sh | sudo bash -s <url>"

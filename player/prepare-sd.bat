@@ -44,9 +44,9 @@ echo.
 echo  Server-URL: !SERVER_URL!
 echo.
 
-REM Server-Config auf Boot-Partition schreiben
-> "%DRIVE%\mysignage-server.conf" echo MYSIGNAGE_SERVER=!SERVER_URL!
-echo  [OK] mysignage-server.conf geschrieben
+REM Server-Config auf Boot-Partition schreiben (LF-Line-Endings via PowerShell)
+powershell -Command "[IO.File]::WriteAllText('%DRIVE%\mysignage-server.conf', 'MYSIGNAGE_SERVER=!SERVER_URL!' + [char]10)"
+echo  [OK] mysignage-server.conf geschrieben (LF)
 
 REM Install-Script auf Boot-Partition kopieren
 copy "%~dp0mysignage-firstboot.sh" "%DRIVE%\mysignage-firstboot.sh" >nul

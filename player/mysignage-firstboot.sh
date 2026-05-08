@@ -16,10 +16,11 @@ echo "  $(date)"
 echo "==========================================="
 echo ""
 
-# Server-URL aus Config laden
+# Server-URL aus Config laden (CRLF-tolerant — Windows-Line-Endings entfernen)
 CONF="/boot/firmware/mysignage-server.conf"
+MYSIGNAGE_SERVER=""
 if [ -f "$CONF" ]; then
-  source "$CONF"
+  MYSIGNAGE_SERVER=$(grep '^MYSIGNAGE_SERVER=' "$CONF" | head -1 | sed 's/^MYSIGNAGE_SERVER=//' | tr -d '\r\n[:space:]')
 fi
 
 if [ -z "$MYSIGNAGE_SERVER" ]; then
