@@ -277,34 +277,36 @@
       text-shadow: 0 1px 6px rgba(0,0,0,0.8);
     }
 
-    /* ─── Content Display ─── */
+    /* ─── Content Display (Cross-Fade Layers) ─── */
     #content-screen {
       display: none;
+      position: relative;
       width: 100%;
       height: 100%;
       background: #000;
     }
 
-    #content-screen img {
+    .slide-layer {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      transition: opacity 600ms ease-in-out;
+      pointer-events: none;
+    }
+
+    .slide-layer.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .slide-layer img,
+    .slide-layer video,
+    .slide-layer iframe {
       width: 100%;
       height: 100%;
       object-fit: contain;
-    }
-
-    #content-screen video {
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-    }
-
-    #content-screen iframe {
-      width: 100%;
-      height: 100%;
       border: none;
     }
-
-    /* fade-in entfernt: Slides wechseln hart ohne Effekt */
-    .fade-in { /* no-op */ }
   </style>
 </head>
 <body>
@@ -389,7 +391,10 @@
   </div>
 
   <!-- Content playback area -->
-  <div id="content-screen"></div>
+  <div id="content-screen">
+    <div class="slide-layer" id="layer-a"></div>
+    <div class="slide-layer" id="layer-b"></div>
+  </div>
 
   <script>
     const API = '/api/status';
@@ -480,13 +485,43 @@
       playNext();
     }
 
+    // ─── Cross-Fade Layer-Verwaltung ───────────────
+    let activeLayerId = 'layer-a';
+    const FADE_MS = 600;
+
+    function getActiveLayer() { return document.getElementById(activeLayerId); }
+    function getInactiveLayer() {
+      return document.getElementById(activeLayerId === 'layer-a' ? 'layer-b' : 'layer-a');
+    }
+
     function stopPlayback() {
       if (playTimer) {
         clearTimeout(playTimer);
         playTimer = null;
       }
-      const video = document.querySelector('#content-screen video');
-      if (video) video.pause();
+      // Aktuell sichtbares Video pausieren
+      const activeVid = getActiveLayer().querySelector('video');
+      if (activeVid) activeVid.pause();
+    }
+
+    // Cross-Fade: neuer Layer wird sichtbar, alter wird unsichtbar.
+    // Erst nach Abschluss des Fades alten Inhalt entfernen.
+    function swapLayers() {
+      const newLayer = getInactiveLayer();
+      const oldLayer = getActiveLayer();
+      newLayer.classList.add('active');
+      oldLayer.classList.remove('active');
+      activeLayerId = newLayer.id;
+      // Alten Inhalt erst nach dem Fade aufräumen
+      setTimeout(() => {
+        // Nur räumen falls in der Zwischenzeit nicht erneut gewechselt wurde
+        if (activeLayerId !== oldLayer.id) {
+          // Video pausieren falls noch eines drin ist
+          const v = oldLayer.querySelector('video');
+          if (v) { try { v.pause(); } catch {} }
+          oldLayer.innerHTML = '';
+        }
+      }, FADE_MS + 50);
     }
 
     // ─── Playback Loop ─────────────────────────────
@@ -499,9 +534,10 @@
       stopPlayback();
       currentIndex = (currentIndex + 1) % playlist.assets.length;
       const asset = playlist.assets[currentIndex];
-      const container = document.getElementById('content-screen');
 
-      container.innerHTML = '';
+      // Neuen Inhalt im inaktiven Layer vorbereiten
+      const target = getInactiveLayer();
+      target.innerHTML = '';
 
       if (asset.type === 'video') {
         const video = document.createElement('video');
@@ -509,15 +545,16 @@
         video.autoplay = true;
         video.muted = false;
         video.playsInline = true;
-        video.className = 'fade-in';
 
         video.onended = () => playNext();
         video.onerror = () => {
           console.error('Video error:', asset.filename);
           playTimer = setTimeout(playNext, 2000);
         };
+        // Sobald der erste Frame fertig dekodiert ist → Crossfade
+        video.onloadeddata = () => swapLayers();
 
-        container.appendChild(video);
+        target.appendChild(video);
 
         if (asset.duration && asset.duration > 0) {
           playTimer = setTimeout(playNext, asset.duration * 1000 + 500);
@@ -525,20 +562,20 @@
 
       } else if (asset.type === 'image') {
         const img = document.createElement('img');
-        img.src = `/media/${asset.filename}`;
-        img.className = 'fade-in';
+        img.onload = () => swapLayers();
         img.onerror = () => {
           console.error('Image error:', asset.filename);
           playTimer = setTimeout(playNext, 2000);
         };
-        container.appendChild(img);
+        img.src = `/media/${asset.filename}`;
+        target.appendChild(img);
         playTimer = setTimeout(playNext, (asset.duration || 10) * 1000);
 
       } else if (asset.type === 'html') {
         const iframe = document.createElement('iframe');
+        iframe.onload = () => swapLayers();
         iframe.src = `/media/${asset.filename}`;
-        iframe.className = 'fade-in';
-        container.appendChild(iframe);
+        target.appendChild(iframe);
         playTimer = setTimeout(playNext, (asset.duration || 30) * 1000);
 
       } else {
