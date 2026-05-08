@@ -14,8 +14,15 @@ curl -sSL https://raw.githubusercontent.com/schco039/mysignage/main/server-insta
 
 Das Script installiert automatisch: Node.js 18, MongoDB 8.0, ffmpeg, pm2 — klont das Repo, baut den Client und startet alles.
 
-Nach der Installation erreichbar unter: `http://<server-ip>:3001`  
-Erster Login: **admin / admin** (bitte sofort ändern)
+Nach der Installation:
+
+- **Admin UI:** `https://<server-ip>:3443` (self-signed Zertifikat, beim ersten Aufruf akzeptieren)
+- **Player-Verbindung:** `http://<server-ip>:3001` (HTTP für Player, von HTTPS-Redirect ausgenommen)
+
+Erster Login: **admin / admin** (Passwort muss beim ersten Login geändert werden)
+
+> HTTP-Aufrufe der Admin-UI werden automatisch nach HTTPS umgeleitet.
+> Player-Pfade (`/sync_folders`, `/socket.io`, `/setup.sh` etc.) bleiben über HTTP erreichbar.
 
 ---
 

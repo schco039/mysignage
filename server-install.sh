@@ -62,12 +62,13 @@ systemctl enable mongod
 systemctl start mongod
 echo "  MongoDB $(mongod --version | head -1) OK"
 
-# ─── 4. System-Tools (ffmpeg, sharp-deps) ────────────────
+# ─── 4. System-Tools (ffmpeg, sharp-deps, openssl) ───────
 echo "[4/7] System-Tools installieren..."
 apt-get install -y -qq \
   ffmpeg \
   libvips-dev \
-  build-essential
+  build-essential \
+  openssl
 echo "  ffmpeg $(ffmpeg -version 2>&1 | head -1 | awk '{print $3}') OK"
 
 # ─── 5. Projekt klonen / aktualisieren ───────────────────
@@ -90,13 +91,14 @@ npm install
 ./node_modules/.bin/vite build
 echo "  Client gebaut OK"
 
-# ─── 6. .env anlegen (falls nicht vorhanden) ─────────────
+# ─── 6. .env + Self-Signed Cert ──────────────────────────
 echo "[6/7] Konfiguration..."
 ENV_FILE="$INSTALL_DIR/server/.env"
 if [ ! -f "$ENV_FILE" ]; then
   JWT_SECRET=$(node -e "console.log(require('crypto').randomBytes(48).toString('hex'))")
   cat > "$ENV_FILE" << EOF
 PORT=3001
+HTTPS_PORT=3443
 MONGODB_URI=mongodb://127.0.0.1:27017/mysignage
 JWT_SECRET=${JWT_SECRET}
 NODE_ENV=production
@@ -104,6 +106,24 @@ EOF
   echo "  .env angelegt (JWT_SECRET zufällig generiert)"
 else
   echo "  .env existiert bereits — nicht überschrieben"
+fi
+
+# Self-Signed Cert für HTTPS (falls noch nicht vorhanden)
+CERT_DIR="$INSTALL_DIR/certs"
+mkdir -p "$CERT_DIR"
+if [ ! -f "$CERT_DIR/cert.pem" ] || [ ! -f "$CERT_DIR/key.pem" ]; then
+  echo "  Self-signed Zertifikat generieren..."
+  SERVER_IP=$(hostname -I | awk '{print $1}')
+  openssl req -x509 -newkey rsa:4096 -nodes \
+    -keyout "$CERT_DIR/key.pem" -out "$CERT_DIR/cert.pem" \
+    -days 3650 \
+    -subj "/CN=mysignage" \
+    -addext "subjectAltName = DNS:localhost,DNS:mysignage,IP:127.0.0.1,IP:${SERVER_IP}" \
+    >/dev/null 2>&1
+  chmod 600 "$CERT_DIR/key.pem"
+  echo "  Zertifikat angelegt (gültig 10 Jahre, für IP $SERVER_IP)"
+else
+  echo "  Zertifikat existiert bereits"
 fi
 
 # ─── 7. pm2 einrichten ───────────────────────────────────
@@ -136,13 +156,15 @@ else
 fi
 
 echo ""
+SRV_IP=$(hostname -I | awk '{print $1}')
 echo "==========================================="
 echo "  mySignage Installation abgeschlossen!"
 echo ""
-echo "  URL:    http://$(hostname -I | awk '{print $1}'):3001"
-echo "  Logs:   pm2 logs mysignage"
-echo "  Status: pm2 status"
+echo "  Admin UI:  https://${SRV_IP}:3443  (self-signed)"
+echo "  Player:    http://${SRV_IP}:3001"
+echo "  Logs:      pm2 logs mysignage"
+echo "  Status:    pm2 status"
 echo ""
 echo "  Erster Login: admin / admin"
-echo "  (Bitte Passwort sofort ändern!)"
+echo "  (Wirst beim ersten Login zum Passwort-Wechsel aufgefordert)"
 echo "==========================================="
