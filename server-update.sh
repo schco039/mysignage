@@ -25,6 +25,11 @@ fi
 
 cd "$INSTALL_DIR"
 
+# Zeitzone sicherstellen (Europa/Wien) falls noch nicht gesetzt
+if [ "$(timedatectl show -p Timezone --value 2>/dev/null)" != "Europe/Vienna" ]; then
+  timedatectl set-timezone Europe/Vienna 2>/dev/null && echo "Zeitzone auf Europe/Vienna gesetzt"
+fi
+
 echo "[1/5] Code aktualisieren..."
 git pull origin main
 echo "  OK"

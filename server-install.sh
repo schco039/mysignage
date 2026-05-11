@@ -31,6 +31,11 @@ if [ "$(id -u)" -ne 0 ]; then
   exit 1
 fi
 
+# ─── Zeitzone Europa/Wien setzen ─────────────────────────
+echo "[0/7] Zeitzone Europe/Vienna setzen..."
+timedatectl set-timezone Europe/Vienna 2>/dev/null || true
+echo "  $(date)"
+
 # ─── 1. System Update ────────────────────────────────────
 echo "[1/7] System update..."
 export DEBIAN_FRONTEND=noninteractive
