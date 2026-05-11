@@ -220,6 +220,7 @@ localApp.listen(LOCAL_PORT, () => {
 
 // ─── Socket.IO Connection to Server ─────────────────────
 let serverConnected = false;
+let tvStatus = true; // wird via CEC-Commands aktualisiert
 
 function connectToServer() {
   const socket = ioClient(config.serverUrl, {
@@ -298,7 +299,10 @@ function connectToServer() {
       const cecCmd = data.args.on ? 'echo "on 0" | cec-client -s -d 1' : 'echo "standby 0" | cec-client -s -d 1';
       try {
         execSync(cecCmd, { timeout: 10000 });
-        console.log(`[Player] TV power: ${data.args.on ? 'on' : 'off'}`);
+        tvStatus = !!data.args.on; // internen Status updaten
+        console.log(`[Player] TV power: ${tvStatus ? 'on' : 'off'}`);
+        // Status sofort senden damit das Backend Bescheid weiß
+        if (socket.connected) sendStatus(socket);
       } catch (err) {
         console.warn('[Player] CEC command failed:', err.message);
       }
@@ -328,7 +332,7 @@ function sendStatus(socket) {
     diskSpaceAvailable: disk.available,
     currentPlaylist: state.playlist?.name || '',
     playlistOn: !!state.playlist,
-    tvStatus: true,
+    tvStatus,
   };
 
   socket.emit('status', {}, statusData, 0);
