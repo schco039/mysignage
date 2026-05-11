@@ -296,16 +296,24 @@ function connectToServer() {
   // Server sends TV power command
   socket.on('cmd', (data) => {
     if (data.cmd === 'tvpower') {
-      const cecCmd = data.args.on ? 'echo "on 0" | cec-client -s -d 1' : 'echo "standby 0" | cec-client -s -d 1';
+      const on = !!data.args.on;
+      // 1. CEC-Command an TV
+      const cecCmd = on ? 'echo "on 0" | cec-client -s -d 1' : 'echo "standby 0" | cec-client -s -d 1';
       try {
         execSync(cecCmd, { timeout: 10000 });
-        tvStatus = !!data.args.on; // internen Status updaten
-        console.log(`[Player] TV power: ${tvStatus ? 'on' : 'off'}`);
-        // Status sofort senden damit das Backend Bescheid weiß
-        if (socket.connected) sendStatus(socket);
       } catch (err) {
         console.warn('[Player] CEC command failed:', err.message);
       }
+      // 2. HDMI-Output am Pi auch (de)aktivieren — verhindert dass der TV
+      //    durch HDMI-Signal-Änderungen (Video-Wechsel) wieder aufwacht
+      try {
+        execSync(`vcgencmd display_power ${on ? 1 : 0}`, { timeout: 5000 });
+      } catch (err) {
+        // vcgencmd nicht verfügbar oder Pi 5 nutzt andere API — egal
+      }
+      tvStatus = on;
+      console.log(`[Player] TV power: ${tvStatus ? 'on' : 'off'} (HDMI ${on ? 'on' : 'off'})`);
+      if (socket.connected) sendStatus(socket);
     }
   });
 
