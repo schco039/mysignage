@@ -341,17 +341,16 @@ function connectToServer() {
   socket.on('cmd', (data) => {
     if (data.cmd === 'tvpower') {
       const on = !!data.args.on;
-      // 1. CEC-Command an TV
-      const cecCmd = on ? 'echo "on 0" | cec-client -s -d 1' : 'echo "standby 0" | cec-client -s -d 1';
-      try {
-        execSync(cecCmd, { timeout: 10000 });
-      } catch (err) {
-        console.warn('[Player] CEC command failed:', err.message);
-      }
+      // Primärweg: HDMI-Signal über Wayland-Compositor steuern.
+      // Die meisten modernen TVs:
+      //   - bei HDMI-OFF → gehen nach kurzer Zeit in Standby ("kein Signal")
+      //   - bei HDMI-ON  → wachen via HDMI-Auto-Wake selbstständig auf
+      // CEC-Befehle bewusst NICHT gesendet — libcec announciert beim Öffnen
+      // den Pi als Gerät und das weckt den TV wieder auf (Sharp-Problem).
       setHdmiPower(on);
 
       tvStatus = on;
-      console.log(`[Player] TV power: ${tvStatus ? 'on' : 'off'}`);
+      console.log(`[Player] TV power: ${tvStatus ? 'on' : 'off'} (HDMI ${on ? 'on' : 'off'})`);
       if (socket.connected) sendStatus(socket);
     }
   });
