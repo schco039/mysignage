@@ -401,16 +401,24 @@ export default function Players() {
                         </button>
                         <button
                           onClick={async () => {
+                            const targetOn = !player.tvStatus;
                             try {
-                              await api.post(`/players/${player._id}/tv-power`, { on: !player.tvStatus });
-                              showToast(`TV ${!player.tvStatus ? 'on' : 'off'} sent`, 'success');
+                              await api.post(`/players/${player._id}/tv-power`, { on: targetOn });
+                              showToast(`TV ${targetOn ? 'on' : 'off'} sent`, 'success');
+                              // Sofort UI refreshen damit nächster Klick gegen aktuellen Stand toggelt
+                              queryClient.invalidateQueries({ queryKey: ['players'] });
                             } catch (err) {
                               showToast(err.response?.data?.error || 'TV command failed', 'error');
                             }
                           }}
-                          className="flex items-center gap-1 px-2 py-1 text-xs bg-gray-50 text-gray-600 rounded hover:bg-gray-100"
+                          className={`flex items-center gap-1 px-2 py-1 text-xs rounded ${
+                            player.tvStatus
+                              ? 'bg-green-50 text-green-700 hover:bg-green-100'
+                              : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                          }`}
+                          title={player.tvStatus ? 'TV is on — click to turn off' : 'TV is off — click to turn on'}
                         >
-                          <Tv size={14} /> TV
+                          <Tv size={14} /> TV {player.tvStatus ? 'on' : 'off'}
                         </button>
                       </>
                     )}
