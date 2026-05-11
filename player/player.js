@@ -96,6 +96,50 @@ function getCpuTemp() {
   }
 }
 
+// ─── HDMI-Output an/aus für CEC-Sleep ─────────────────────
+// Pi OS Trixie/Wayland: vcgencmd ist deprecated → wlr-randr/wlopm nutzen.
+// Service läuft als pi-User aber kennt das Wayland-Socket nicht von selbst.
+function setHdmiPower(on) {
+  const uid = process.getuid ? process.getuid() : 1000;
+  const xdgRuntimeDir = `/run/user/${uid}`;
+
+  // Wayland-Socket finden (wayland-0, wayland-1, ...)
+  let waylandDisplay = 'wayland-0';
+  try {
+    const sockets = fs.readdirSync(xdgRuntimeDir).filter((f) => /^wayland-\d+$/.test(f));
+    if (sockets[0]) waylandDisplay = sockets[0];
+  } catch {}
+
+  const env = {
+    ...process.env,
+    WAYLAND_DISPLAY: waylandDisplay,
+    XDG_RUNTIME_DIR: xdgRuntimeDir,
+  };
+
+  // Methode 1: wlopm (einfachste Wayland-Methode)
+  try {
+    execSync(`wlopm --${on ? 'on' : 'off'} '*'`, { timeout: 3000, env });
+    return;
+  } catch {}
+
+  // Methode 2: wlr-randr für jeden Output
+  try {
+    const out = execSync('wlr-randr', { encoding: 'utf8', timeout: 3000, env });
+    const outputs = out
+      .split('\n')
+      .filter((l) => /^[A-Z]/.test(l))
+      .map((l) => l.split(' ')[0])
+      .filter(Boolean);
+    for (const o of outputs) {
+      try { execSync(`wlr-randr --output ${o} --${on ? 'on' : 'off'}`, { timeout: 3000, env }); } catch {}
+    }
+    return;
+  } catch {}
+
+  // Methode 3: vcgencmd (Pi-Firmware Legacy)
+  try { execSync(`vcgencmd display_power ${on ? 1 : 0}`, { timeout: 3000 }); } catch {}
+}
+
 const cpuSerialNumber = getCpuSerial();
 const { ethMac, wifiMac } = getMacAddresses();
 console.log(`[Player] ID: ${cpuSerialNumber}`);
@@ -304,27 +348,10 @@ function connectToServer() {
       } catch (err) {
         console.warn('[Player] CEC command failed:', err.message);
       }
-      // 2. HDMI-Output am Pi (de)aktivieren — verhindert Auto-Wake durch HDMI-Signal.
-      //    Mehrere Methoden weil je nach Pi OS / Display-Stack unterschiedlich:
-      //    - wlr-randr (Wayland / labwc) — modernste Methode
-      //    - vcgencmd (Pi-Firmware, auf Trixie/Wayland teils deprecated)
-      //    - tvservice (alte Pi-Methode)
-      const hdmiOn = on;
-      // Methode 1: wlr-randr für alle Outputs
-      try {
-        const out = execSync('wlr-randr 2>/dev/null', { encoding: 'utf8', timeout: 3000, env: { ...process.env, WAYLAND_DISPLAY: 'wayland-0', XDG_RUNTIME_DIR: '/run/user/1000' } });
-        const outputs = out.split('\n').filter(l => /^\S/.test(l) && !/^Adaptive/.test(l)).map(l => l.split(' ')[0]).filter(Boolean);
-        for (const o of outputs) {
-          execSync(`wlr-randr --output ${o} --${hdmiOn ? 'on' : 'off'}`, { timeout: 3000, env: { ...process.env, WAYLAND_DISPLAY: 'wayland-0', XDG_RUNTIME_DIR: '/run/user/1000' } });
-        }
-      } catch {}
-      // Methode 2: vcgencmd
-      try { execSync(`vcgencmd display_power ${hdmiOn ? 1 : 0}`, { timeout: 3000 }); } catch {}
-      // Methode 3: tvservice (legacy)
-      try { execSync(hdmiOn ? 'tvservice -p' : 'tvservice -o', { timeout: 3000 }); } catch {}
+      setHdmiPower(on);
 
       tvStatus = on;
-      console.log(`[Player] TV power: ${tvStatus ? 'on' : 'off'} (HDMI ${hdmiOn ? 'on' : 'off'})`);
+      console.log(`[Player] TV power: ${tvStatus ? 'on' : 'off'}`);
       if (socket.connected) sendStatus(socket);
     }
   });
