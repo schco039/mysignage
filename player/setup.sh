@@ -23,7 +23,17 @@ if [ -z "$SERVER_URL" ]; then
   echo "Nutzung: curl -sSL <url>/setup.sh | sudo bash -s <url>"
   exit 1
 fi
-INSTALL_DIR="/home/pi/mysignage"
+# Ziel-User: erster regulärer User (UID 1000) — meist 'pi', kann aber abweichen
+TARGET_USER=$(getent passwd 1000 | cut -d: -f1)
+if [ -z "$TARGET_USER" ]; then
+  echo "FEHLER: Kein User mit UID 1000 gefunden!"
+  exit 1
+fi
+TARGET_HOME=$(getent passwd "$TARGET_USER" | cut -d: -f6)
+TARGET_GROUP=$(id -gn "$TARGET_USER")
+echo "  Ziel-User: $TARGET_USER ($TARGET_HOME)"
+
+INSTALL_DIR="$TARGET_HOME/mysignage"
 NODE_VERSION="18"
 PROGRESS_FILE="/tmp/mysignage-setup-progress"
 
@@ -113,7 +123,7 @@ EOF
   cd "$INSTALL_DIR"
   npm install --production
 
-  chown -R pi:pi "$INSTALL_DIR"
+  chown -R "$TARGET_USER":"$TARGET_GROUP" "$INSTALL_DIR"
   echo "  Player-App eingerichtet"
   set_progress 5
 fi
@@ -131,7 +141,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=pi
+User=${TARGET_USER}
 WorkingDirectory=${INSTALL_DIR}
 ExecStart=/usr/bin/node player.js
 Restart=always
@@ -147,17 +157,17 @@ EOF
   systemctl start mysignage-player.service
 
   # Clean up any old autostart files
-  rm -f /home/pi/.config/autostart/mysignage-kiosk.desktop 2>/dev/null
+  rm -f "$TARGET_HOME/.config/autostart/mysignage-kiosk.desktop" 2>/dev/null
 
   # labwc autostart — runs inside the Wayland session on boot
-  mkdir -p /home/pi/.config/labwc
-  cat > /home/pi/.config/labwc/autostart << 'EOF'
+  mkdir -p "$TARGET_HOME/.config/labwc"
+  cat > "$TARGET_HOME/.config/labwc/autostart" << EOF
 # mySignage Kiosk — launched by labwc at session start
-/home/pi/mysignage/start-kiosk.sh &
+${INSTALL_DIR}/start-kiosk.sh &
 EOF
 
   # Kiosk start script (uses Xwayland display :0 inside labwc)
-  cat > /home/pi/mysignage/start-kiosk.sh << 'EOFKIOSK'
+  cat > "${INSTALL_DIR}/start-kiosk.sh" << 'EOFKIOSK'
 #!/bin/bash
 # Wait for player local server to be ready
 for i in $(seq 1 30); do
@@ -195,10 +205,10 @@ exec chromium \
   --autoplay-policy=no-user-gesture-required \
   http://localhost:8000
 EOFKIOSK
-  chmod +x /home/pi/mysignage/start-kiosk.sh
+  chmod +x "${INSTALL_DIR}/start-kiosk.sh"
 
   # ─── Chromium Preferences (pre-configure to avoid popups) ───
-  CHROME_DIR="/home/pi/.config/chromium"
+  CHROME_DIR="${TARGET_HOME}/.config/chromium"
   mkdir -p "$CHROME_DIR/Default"
   cat > "$CHROME_DIR/Default/Preferences" << 'PREFS'
 {
@@ -223,9 +233,9 @@ LOCALSTATE
   # ─── Disable GNOME Keyring completely ───
   apt-get remove -y gnome-keyring 2>/dev/null || true
   systemctl --user mask gnome-keyring-daemon.service 2>/dev/null || true
-  mkdir -p /home/pi/.config/autostart
+  mkdir -p "${TARGET_HOME}/.config/autostart"
   for svc in gnome-keyring-ssh gnome-keyring-secrets gnome-keyring-pkcs11; do
-    cat > "/home/pi/.config/autostart/${svc}.desktop" << EOF2
+    cat > "${TARGET_HOME}/.config/autostart/${svc}.desktop" << EOF2
 [Desktop Entry]
 Type=Application
 Hidden=true
@@ -233,8 +243,8 @@ EOF2
   done
 
   # Fix all ownership
-  chown -R pi:pi /home/pi/.config /home/pi/.local 2>/dev/null || true
-  chown -R pi:pi /home/pi/mysignage
+  chown -R "$TARGET_USER":"$TARGET_GROUP" "${TARGET_HOME}/.config" "${TARGET_HOME}/.local" 2>/dev/null || true
+  chown -R "$TARGET_USER":"$TARGET_GROUP" "${INSTALL_DIR}"
 
   # ─── Auto-Login zum Desktop ───
   # Session aus den verfügbaren Wayland-Sessions ermitteln (labwc bevorzugt)
@@ -259,7 +269,7 @@ EOF2
     mkdir -p /etc/lightdm/lightdm.conf.d
     cat > /etc/lightdm/lightdm.conf.d/50-mysignage-autologin.conf << LIGHTDMEOF
 [Seat:*]
-autologin-user=pi
+autologin-user=${TARGET_USER}
 autologin-user-timeout=0
 autologin-session=${AUTOLOGIN_SESSION}
 user-session=${AUTOLOGIN_SESSION}
@@ -268,23 +278,23 @@ LIGHTDMEOF
 
   # Versuch 3: AccountsService (Pi OS Trixie nutzt das)
   mkdir -p /var/lib/AccountsService/users
-  cat > /var/lib/AccountsService/users/pi << ACCEOF
+  cat > "/var/lib/AccountsService/users/${TARGET_USER}" << ACCEOF
 [User]
 Session=${AUTOLOGIN_SESSION}
 SystemAccount=false
 ACCEOF
 
-  # Pi-User braucht "autologin" Gruppen-Mitgliedschaft
-  usermod -aG autologin pi 2>/dev/null || true
+  # User in autologin-Gruppe (existiert auf manchen Pi OS Images)
+  usermod -aG autologin "$TARGET_USER" 2>/dev/null || true
 
   # NOPASSWD sudo für reboot/shutdown (damit Player das ohne Passwort kann)
-  cat > /etc/sudoers.d/050_mysignage-player << 'SUDOEOF'
-pi ALL=(ALL) NOPASSWD: /sbin/reboot, /sbin/shutdown, /usr/sbin/reboot, /usr/sbin/shutdown
+  cat > /etc/sudoers.d/050_mysignage-player << SUDOEOF
+${TARGET_USER} ALL=(ALL) NOPASSWD: /sbin/reboot, /sbin/shutdown, /usr/sbin/reboot, /usr/sbin/shutdown
 SUDOEOF
   chmod 440 /etc/sudoers.d/050_mysignage-player
 
   # Remove any old .bash_profile X11 autostart
-  sed -i '/startx\|xinit\|openbox/d' /home/pi/.bash_profile 2>/dev/null || true
+  sed -i '/startx\|xinit\|openbox/d' "${TARGET_HOME}/.bash_profile" 2>/dev/null || true
 
   echo "  Autostart konfiguriert"
   set_progress 6
@@ -330,8 +340,8 @@ if [ "$STEP" -lt 7 ]; then
 
   # Disable lxplug-updater (LXDE panel update plugin)
   rm -f /etc/xdg/autostart/lxplug-updater.desktop 2>/dev/null || true
-  mkdir -p /home/pi/.config/autostart
-  cat > /home/pi/.config/autostart/lxplug-updater.desktop << 'UPDEOF'
+  mkdir -p "${TARGET_HOME}/.config/autostart"
+  cat > "${TARGET_HOME}/.config/autostart/lxplug-updater.desktop" << 'UPDEOF'
 [Desktop Entry]
 Type=Application
 Hidden=true
@@ -340,7 +350,7 @@ UPDEOF
   # Disable LXDE/Pixel notifications
   rm -f /etc/xdg/autostart/pprompt.desktop 2>/dev/null || true
 
-  chown -R pi:pi /home/pi/.config 2>/dev/null || true
+  chown -R "$TARGET_USER":"$TARGET_GROUP" "${TARGET_HOME}/.config" 2>/dev/null || true
 
   echo "  System optimiert"
   set_progress 7
