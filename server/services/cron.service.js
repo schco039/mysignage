@@ -69,13 +69,16 @@ async function checkSleep(ioInstances, group) {
     isConnected: true,
   });
 
+  // CEC-Commands sind idempotent — wir senden immer den gewünschten State.
+  // Das stellt sicher dass der Schedule auch dann durchgesetzt wird
+  // wenn z.B. jemand mit der Fernbedienung den TV manuell anschaltet.
   for (const player of players) {
+    await emitToPlayer(ioInstances, player._id, 'cmd', {
+      cmd: 'tvpower',
+      args: { on: shouldBeOn },
+    });
     if (player.tvStatus !== shouldBeOn) {
-      await emitToPlayer(ioInstances, player._id, 'cmd', {
-        cmd: 'tvpower',
-        args: { on: shouldBeOn },
-      });
-      await log('cec', `TV ${shouldBeOn ? 'ON' : 'OFF'}`, {
+      await log('cec', `TV ${shouldBeOn ? 'ON' : 'OFF'} (schedule)`, {
         player: player.name || player.cpuSerialNumber,
         playerId: player._id,
         userGroup: group.name,
