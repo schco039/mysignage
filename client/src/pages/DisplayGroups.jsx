@@ -204,7 +204,7 @@ function DeployModal({ group, players, deploying, onDeploy, onClose }) {
     if (mode === 'all') {
       onDeploy(null);
     } else {
-      if (selectedIds.length === 0) { alert('Bitte mindestens einen Screen wählen'); return; }
+      if (selectedIds.length === 0) { alert('Please select at least one screen'); return; }
       onDeploy(selectedIds);
     }
   };
@@ -238,7 +238,7 @@ function DeployModal({ group, players, deploying, onDeploy, onClose }) {
                   : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
               }`}
             >
-              Alle Screens ({connectedPlayers.length})
+              All screens ({connectedPlayers.length})
             </button>
             <button
               onClick={() => setMode('select')}
@@ -248,7 +248,7 @@ function DeployModal({ group, players, deploying, onDeploy, onClose }) {
                   : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
               }`}
             >
-              Einzelne wählen
+              Select individual
             </button>
           </div>
 
@@ -257,7 +257,7 @@ function DeployModal({ group, players, deploying, onDeploy, onClose }) {
             <div className="space-y-1 max-h-60 overflow-y-auto">
               {players.length === 0 ? (
                 <div className="text-sm text-gray-400 text-center py-4">
-                  Keine Player in dieser Gruppe
+                  No players in this group
                 </div>
               ) : (
                 players.map((player) => {

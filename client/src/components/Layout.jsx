@@ -47,14 +47,14 @@ function PasswordModal({ onClose, forced = false, onSuccess }) {
       if (onSuccess) onSuccess();
       setTimeout(() => onClose(), 1500);
     },
-    onError: (err) => setError(err.response?.data?.error || 'Fehler'),
+    onError: (err) => setError(err.response?.data?.error || 'Error'),
   });
 
   const handleSubmit = (e) => {
     e.preventDefault();
     setError('');
-    if (newPassword !== confirm) { setError('Passwörter stimmen nicht überein'); return; }
-    if (newPassword.length < 4) { setError('Mindestens 4 Zeichen'); return; }
+    if (newPassword !== confirm) { setError('Passwords do not match'); return; }
+    if (newPassword.length < 4) { setError('At least 4 characters'); return; }
     mutation.mutate({ currentPassword, newPassword });
   };
 
@@ -63,10 +63,10 @@ function PasswordModal({ onClose, forced = false, onSuccess }) {
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
         <div className="flex items-center justify-between p-4 border-b">
           <div>
-            <h3 className="font-semibold">Passwort ändern</h3>
+            <h3 className="font-semibold">Change password</h3>
             {forced && (
               <p className="text-xs text-orange-600 mt-1">
-                Du musst dein Passwort beim ersten Login ändern.
+                You must change your password on first login.
               </p>
             )}
           </div>
@@ -76,11 +76,11 @@ function PasswordModal({ onClose, forced = false, onSuccess }) {
         </div>
         <form onSubmit={handleSubmit} className="p-4 space-y-3">
           {success ? (
-            <div className="text-center text-green-600 font-medium py-4">✓ Passwort geändert</div>
+            <div className="text-center text-green-600 font-medium py-4">✓ Password changed</div>
           ) : (
             <>
               <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1">Aktuelles Passwort</label>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Current password</label>
                 <input
                   type="password"
                   value={currentPassword}
@@ -90,7 +90,7 @@ function PasswordModal({ onClose, forced = false, onSuccess }) {
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1">Neues Passwort</label>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">New password</label>
                 <input
                   type="password"
                   value={newPassword}
@@ -100,7 +100,7 @@ function PasswordModal({ onClose, forced = false, onSuccess }) {
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1">Bestätigen</label>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Confirm</label>
                 <input
                   type="password"
                   value={confirm}
@@ -115,7 +115,7 @@ function PasswordModal({ onClose, forced = false, onSuccess }) {
                 disabled={mutation.isPending}
                 className="w-full btn-brand py-2 text-sm disabled:opacity-40"
               >
-                {mutation.isPending ? 'Speichere...' : 'Passwort ändern'}
+                {mutation.isPending ? 'Saving...' : 'Change password'}
               </button>
             </>
           )}
@@ -234,7 +234,7 @@ export default function Layout() {
               <button
                 onClick={() => setPasswordModal(true)}
                 className="text-white/40 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-white/10"
-                title="Passwort ändern"
+                title="Change password"
               >
                 <KeyRound size={16} />
               </button>

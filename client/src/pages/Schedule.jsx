@@ -26,9 +26,9 @@ function getGroupColor(groupId, groups) {
   return COLORS[idx % COLORS.length];
 }
 
-const DAYS_LABELS = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+const DAYS_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-// Date Helpers: ISO yyyy-mm-dd ↔ deutsches dd.mm.yyyy
+// Date Helpers: ISO yyyy-mm-dd ↔ display dd.mm.yyyy
 function isoToDe(iso) {
   if (!iso) return '';
   const [y, m, d] = iso.split('-');
@@ -182,14 +182,14 @@ export default function Schedule() {
             onClick={() => setModal({ mode: 'create', startDate: '', endDate: '' })}
             className="flex items-center gap-2 btn-brand"
           >
-            <Plus size={18} /> Neuer Eintrag
+            <Plus size={18} /> New Entry
           </button>
           <select
             value={filterGroup}
             onChange={(e) => setFilterGroup(e.target.value)}
             className="border rounded-lg px-3 py-2 text-sm"
           >
-            <option value="">Alle Gruppen</option>
+            <option value="">All groups</option>
             {userGroups.map((ug) => (
               <option key={ug._id} value={ug._id}>{ug.name}</option>
             ))}
@@ -213,7 +213,7 @@ export default function Schedule() {
             events={events}
             height="auto"
             firstDay={1}
-            locale="de"
+            locale="en-gb"
             nowIndicator
             eventDisplay="block"
             dayMaxEvents={3}
@@ -226,12 +226,12 @@ export default function Schedule() {
         <div>
           <div className="card">
             <div className="p-4 border-b">
-              <h3 className="font-semibold text-sm">Immer aktiv</h3>
+              <h3 className="font-semibold text-sm">Always active</h3>
             </div>
             <div className="max-h-96 overflow-y-auto divide-y">
               {unscheduled.length === 0 ? (
                 <div className="p-4 text-sm text-gray-500 text-center">
-                  Alles hat einen Zeitplan.
+                  Everything is scheduled.
                 </div>
               ) : (
                 unscheduled.map((pl) => {
@@ -343,13 +343,13 @@ function CreateScheduleModal({ modal, allAssets, allPlayers, userGroups, onSave,
   };
 
   const handleSubmit = () => {
-    if (selectedAssets.length === 0) { alert('Bitte ein Asset auswählen'); return; }
-    if (selectedPlayerIds.length === 0) { alert('Bitte mindestens einen Bildschirm auswählen'); return; }
+    if (selectedAssets.length === 0) { alert('Please select an asset'); return; }
+    if (selectedPlayerIds.length === 0) { alert('Please select at least one screen'); return; }
 
     const isoStart = deToIso(startDate);
     const isoEnd = deToIso(endDate);
-    if (startDate && !isoStart) { alert('Startdatum hat falsches Format (TT.MM.JJJJ)'); return; }
-    if (endDate && !isoEnd) { alert('Enddatum hat falsches Format (TT.MM.JJJJ)'); return; }
+    if (startDate && !isoStart) { alert('Start date must be DD.MM.YYYY'); return; }
+    if (endDate && !isoEnd) { alert('End date must be DD.MM.YYYY'); return; }
 
     const autoName = name || selectedAssets[0]?.originalName || 'Schedule';
     onSave({
@@ -368,7 +368,7 @@ function CreateScheduleModal({ modal, allAssets, allPlayers, userGroups, onSave,
     });
   };
 
-  const stepTitles = ['Asset auswählen', 'Bildschirme wählen', 'Zeitplan'];
+  const stepTitles = ['Select asset', 'Select screens', 'Schedule'];
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
@@ -439,7 +439,7 @@ function CreateScheduleModal({ modal, allAssets, allPlayers, userGroups, onSave,
                 })}
               </div>
               {filteredAssets.length === 0 && (
-                <div className="text-center text-gray-400 py-8 text-sm">Keine Assets gefunden.</div>
+                <div className="text-center text-gray-400 py-8 text-sm">No assets found.</div>
               )}
             </div>
             <div className="p-4 border-t shrink-0 flex justify-end">
@@ -448,7 +448,7 @@ function CreateScheduleModal({ modal, allAssets, allPlayers, userGroups, onSave,
                 disabled={selectedAssets.length === 0}
                 className="btn-brand px-6 py-2 disabled:opacity-40"
               >
-                Weiter
+                Next
               </button>
             </div>
           </>
@@ -463,21 +463,21 @@ function CreateScheduleModal({ modal, allAssets, allPlayers, userGroups, onSave,
                 onChange={(e) => { setFilterGroup(e.target.value); setSelectedPlayerIds([]); }}
                 className="w-full border rounded-lg px-3 py-2 text-sm"
               >
-                <option value="">Alle Gruppen</option>
+                <option value="">All groups</option>
                 {userGroups.map((ug) => (
                   <option key={ug._id} value={ug._id}>{ug.name}</option>
                 ))}
               </select>
               {selectedPlayerIds.length > 0 && (
                 <div className="mt-2 text-sm text-brand-600 font-medium">
-                  {selectedPlayerIds.length} Bildschirm(e) ausgewählt
+                  {selectedPlayerIds.length} screen(s) selected
                 </div>
               )}
             </div>
             <div className="flex-1 overflow-y-auto p-2">
               {visiblePlayers.length === 0 ? (
                 <div className="text-center text-gray-400 py-8 text-sm">
-                  Keine Bildschirme in dieser Gruppe.
+                  No screens in this group.
                 </div>
               ) : (
                 <div className="space-y-1">
@@ -501,7 +501,7 @@ function CreateScheduleModal({ modal, allAssets, allPlayers, userGroups, onSave,
                             {player.name || player.cpuSerialNumber || 'Unnamed'}
                           </div>
                           <div className="text-xs text-gray-400">
-                            {groupNames || 'Keine Gruppe'} — {player.myIpAddress || player.ip || '-'}
+                            {groupNames || 'No group'} — {player.myIpAddress || player.ip || '-'}
                           </div>
                         </div>
                         <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${
@@ -517,14 +517,14 @@ function CreateScheduleModal({ modal, allAssets, allPlayers, userGroups, onSave,
             </div>
             <div className="p-4 border-t shrink-0 flex gap-2">
               <button onClick={() => setStep(1)} className="px-4 py-2 rounded-lg border hover:bg-gray-50 text-sm">
-                Zurück
+                Back
               </button>
               <button
                 onClick={() => setStep(3)}
                 disabled={selectedPlayerIds.length === 0}
                 className="flex-1 btn-brand py-2 disabled:opacity-40"
               >
-                Weiter ({selectedPlayerIds.length} Screens)
+                Next ({selectedPlayerIds.length} screens)
               </button>
             </div>
           </>
@@ -549,7 +549,7 @@ function CreateScheduleModal({ modal, allAssets, allPlayers, userGroups, onSave,
                   )}
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-semibold truncate">{selectedAssets[0]?.originalName}</div>
-                    <div className="text-xs text-gray-400">{selectedPlayerIds.length} Bildschirm(e)</div>
+                    <div className="text-xs text-gray-400">{selectedPlayerIds.length} screen(s)</div>
                   </div>
                 </div>
               </div>
@@ -573,16 +573,16 @@ function CreateScheduleModal({ modal, allAssets, allPlayers, userGroups, onSave,
                     <CalendarIcon size={11} className="inline mr-1" />Start
                   </label>
                   <input
-                    type="text" inputMode="numeric" pattern="^\d{1,2}\.\d{1,2}\.\d{4}$" placeholder="TT.MM.JJJJ"
+                    type="text" inputMode="numeric" pattern="^\d{1,2}\.\d{1,2}\.\d{4}$" placeholder="DD.MM.YYYY"
                     value={startDate} onChange={(e) => setStartDate(e.target.value)}
                     className="w-full border rounded-lg px-3 py-2 text-sm font-mono" />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-                    <CalendarIcon size={11} className="inline mr-1" />Ende
+                    <CalendarIcon size={11} className="inline mr-1" />End
                   </label>
                   <input
-                    type="text" inputMode="numeric" pattern="^\d{1,2}\.\d{1,2}\.\d{4}$" placeholder="TT.MM.JJJJ"
+                    type="text" inputMode="numeric" pattern="^\d{1,2}\.\d{1,2}\.\d{4}$" placeholder="DD.MM.YYYY"
                     value={endDate} onChange={(e) => setEndDate(e.target.value)}
                     className="w-full border rounded-lg px-3 py-2 text-sm font-mono" />
                 </div>
@@ -591,7 +591,7 @@ function CreateScheduleModal({ modal, allAssets, allPlayers, userGroups, onSave,
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-                    <Clock size={11} className="inline mr-1" />Von
+                    <Clock size={11} className="inline mr-1" />From
                   </label>
                   <input
                     type="text" inputMode="numeric" pattern="^([01]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM"
@@ -600,7 +600,7 @@ function CreateScheduleModal({ modal, allAssets, allPlayers, userGroups, onSave,
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-                    <Clock size={11} className="inline mr-1" />Bis
+                    <Clock size={11} className="inline mr-1" />To
                   </label>
                   <input
                     type="text" inputMode="numeric" pattern="^([01]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM"
@@ -608,11 +608,11 @@ function CreateScheduleModal({ modal, allAssets, allPlayers, userGroups, onSave,
                     className="w-full border rounded-lg px-3 py-2 text-sm font-mono" />
                 </div>
               </div>
-              <p className="text-xs text-gray-400">Leer = ganztägig / immer aktiv</p>
+              <p className="text-xs text-gray-400">Empty = all day / always active</p>
 
               <div>
                 <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                  Wochentage
+                  Weekdays
                 </label>
                 <div className="flex gap-1">
                   {DAYS_LABELS.map((label, idx) => (
@@ -639,14 +639,14 @@ function CreateScheduleModal({ modal, allAssets, allPlayers, userGroups, onSave,
 
             <div className="p-4 border-t shrink-0 flex gap-2">
               <button onClick={() => setStep(2)} className="px-4 py-2 rounded-lg border hover:bg-gray-50 text-sm">
-                Zurück
+                Back
               </button>
               <button
                 onClick={handleSubmit}
                 disabled={isPending}
                 className="flex-1 btn-brand py-2 text-sm disabled:opacity-40"
               >
-                {isPending ? 'Erstelle...' : 'Erstellen & Deployen'}
+                {isPending ? 'Creating...' : 'Create & Deploy'}
               </button>
             </div>
           </>
@@ -694,9 +694,9 @@ function EditScheduleModal({ playlist, allPlayers, onSave, onDelete, onClose, is
     e.preventDefault();
     const isoStart = deToIso(startDate);
     const isoEnd = deToIso(endDate);
-    if (startDate && !isoStart) { alert('Startdatum: TT.MM.JJJJ'); return; }
-    if (endDate && !isoEnd) { alert('Enddatum: TT.MM.JJJJ'); return; }
-    if (selectedPlayerIds.length === 0) { alert('Mindestens einen Bildschirm auswählen'); return; }
+    if (startDate && !isoStart) { alert('Start date must be DD.MM.YYYY'); return; }
+    if (endDate && !isoEnd) { alert('End date must be DD.MM.YYYY'); return; }
+    if (selectedPlayerIds.length === 0) { alert('Select at least one screen'); return; }
     onSave(playlist._id, {
       enabled,
       startDate: isoStart || null,
@@ -715,21 +715,21 @@ function EditScheduleModal({ playlist, allPlayers, onSave, onDelete, onClose, is
             <h3 className="text-lg font-semibold">{assetName}</h3>
             <div className="text-xs text-gray-400">
               {playlist.userGroup?.name}
-              {selectedPlayerIds.length > 0 && ` — ${selectedPlayerIds.length} Bildschirm(e)`}
+              {selectedPlayerIds.length > 0 && ` — ${selectedPlayerIds.length} screen(s)`}
             </div>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-4 space-y-4 max-h-[75vh] overflow-y-auto">
-          {/* Bildschirme zuordnen */}
+          {/* Assign screens */}
           <div>
             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-              <Monitor size={11} className="inline mr-1" />Bildschirme
+              <Monitor size={11} className="inline mr-1" />Screens
             </label>
             <div className="space-y-1 max-h-48 overflow-y-auto border rounded-lg p-1">
               {visiblePlayers.length === 0 ? (
-                <div className="text-xs text-gray-400 text-center py-2">Keine Bildschirme verfügbar</div>
+                <div className="text-xs text-gray-400 text-center py-2">No screens available</div>
               ) : (
                 visiblePlayers.map((player) => {
                   const selected = selectedPlayerIds.includes(player._id);
@@ -762,7 +762,7 @@ function EditScheduleModal({ playlist, allPlayers, onSave, onDelete, onClose, is
               onChange={(e) => setEnabled(e.target.checked)}
               className="w-4 h-4 rounded border-gray-300 text-blue-600"
             />
-            <span className="text-sm font-medium">Zeitplan aktiviert</span>
+            <span className="text-sm font-medium">Schedule enabled</span>
           </label>
 
           {enabled && (
@@ -773,16 +773,16 @@ function EditScheduleModal({ playlist, allPlayers, onSave, onDelete, onClose, is
                     <CalendarIcon size={11} className="inline mr-1" />Start
                   </label>
                   <input
-                    type="text" inputMode="numeric" pattern="^\d{1,2}\.\d{1,2}\.\d{4}$" placeholder="TT.MM.JJJJ"
+                    type="text" inputMode="numeric" pattern="^\d{1,2}\.\d{1,2}\.\d{4}$" placeholder="DD.MM.YYYY"
                     value={startDate} onChange={(e) => setStartDate(e.target.value)}
                     className="w-full border rounded-lg px-3 py-2 text-sm font-mono" />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 mb-1">
-                    <CalendarIcon size={11} className="inline mr-1" />Ende
+                    <CalendarIcon size={11} className="inline mr-1" />End
                   </label>
                   <input
-                    type="text" inputMode="numeric" pattern="^\d{1,2}\.\d{1,2}\.\d{4}$" placeholder="TT.MM.JJJJ"
+                    type="text" inputMode="numeric" pattern="^\d{1,2}\.\d{1,2}\.\d{4}$" placeholder="DD.MM.YYYY"
                     value={endDate} onChange={(e) => setEndDate(e.target.value)}
                     className="w-full border rounded-lg px-3 py-2 text-sm font-mono" />
                 </div>
@@ -790,7 +790,7 @@ function EditScheduleModal({ playlist, allPlayers, onSave, onDelete, onClose, is
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 mb-1">
-                    <Clock size={11} className="inline mr-1" />Von
+                    <Clock size={11} className="inline mr-1" />From
                   </label>
                   <input
                     type="text" inputMode="numeric" pattern="^([01]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM"
@@ -799,7 +799,7 @@ function EditScheduleModal({ playlist, allPlayers, onSave, onDelete, onClose, is
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 mb-1">
-                    <Clock size={11} className="inline mr-1" />Bis
+                    <Clock size={11} className="inline mr-1" />To
                   </label>
                   <input
                     type="text" inputMode="numeric" pattern="^([01]?[0-9]|2[0-3]):[0-5][0-9]$" placeholder="HH:MM"
@@ -807,9 +807,9 @@ function EditScheduleModal({ playlist, allPlayers, onSave, onDelete, onClose, is
                     className="w-full border rounded-lg px-3 py-2 text-sm font-mono" />
                 </div>
               </div>
-              <p className="text-xs text-gray-400">Leer = ganztägig</p>
+              <p className="text-xs text-gray-400">Empty = all day</p>
               <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-2">Wochentage</label>
+                <label className="block text-xs font-semibold text-gray-500 mb-2">Weekdays</label>
                 <div className="flex gap-1">
                   {DAYS_LABELS.map((label, idx) => (
                     <button
@@ -836,14 +836,14 @@ function EditScheduleModal({ playlist, allPlayers, onSave, onDelete, onClose, is
 
           <div className="flex gap-2 pt-2">
             <button type="submit" disabled={isPending} className="flex-1 btn-brand py-2 text-sm">
-              {isPending ? 'Speichere...' : 'Speichern'}
+              {isPending ? 'Saving...' : 'Save'}
             </button>
             <button
               type="button"
-              onClick={() => { if (confirm('Eintrag löschen?')) onDelete(playlist._id); onClose(); }}
+              onClick={() => { if (confirm('Delete entry?')) onDelete(playlist._id); onClose(); }}
               className="px-4 py-2 text-red-600 border border-red-200 rounded-lg hover:bg-red-50 text-sm"
             >
-              Löschen
+              Delete
             </button>
           </div>
         </form>

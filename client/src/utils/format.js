@@ -1,6 +1,6 @@
-// Deutsche Zeit-/Datums-Formatierung (24h, dd.MM.yyyy)
+// English date/time formatting (24h, DD/MM/YYYY)
 
-const LOCALE = 'de-DE';
+const LOCALE = 'en-GB';
 
 export function formatDateTime(date) {
   if (!date) return '-';

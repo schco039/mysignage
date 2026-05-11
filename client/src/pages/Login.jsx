@@ -56,7 +56,7 @@ export default function Login() {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-white placeholder-white/40 focus:ring-2 focus:ring-white/30 focus:border-white/40 focus:bg-white/15 outline-none transition-all backdrop-blur-sm"
-                placeholder="Benutzername"
+                placeholder="Username"
                 required
               />
             </div>
@@ -68,7 +68,7 @@ export default function Login() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-white placeholder-white/40 focus:ring-2 focus:ring-white/30 focus:border-white/40 focus:bg-white/15 outline-none transition-all backdrop-blur-sm"
-                placeholder="Passwort"
+                placeholder="Password"
                 required
               />
             </div>
@@ -81,9 +81,9 @@ export default function Login() {
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
                   <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
-                  Laden...
+                  Loading...
                 </span>
-              ) : 'Anmelden'}
+              ) : 'Sign in'}
             </button>
           </form>
 

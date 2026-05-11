@@ -64,9 +64,9 @@ export default function Players() {
 
   const sendAction = async (id, action) => {
     const labels = {
-      screenshot: 'Screenshot angefordert',
-      reboot: 'Neustart-Befehl gesendet',
-      'tv-power': 'TV-Power-Befehl gesendet',
+      screenshot: 'Screenshot requested',
+      reboot: 'Reboot command sent',
+      'tv-power': 'TV power command sent',
     };
     try {
       await api.post(`/players/${id}/${action}`);
@@ -77,11 +77,11 @@ export default function Players() {
             ...prev,
             [id]: `/media/_screenshots/${players.find((p) => p._id === id)?.cpuSerialNumber}.png?t=${Date.now()}`,
           }));
-          showToast('Screenshot empfangen', 'success');
+          showToast('Screenshot received', 'success');
         }, 3000);
       }
     } catch (err) {
-      showToast(err.response?.data?.error || `${action} fehlgeschlagen`, 'error');
+      showToast(err.response?.data?.error || `${action} failed`, 'error');
     }
   };
 
@@ -90,10 +90,10 @@ export default function Players() {
     if (!cmd) return;
     try {
       await api.post(`/players/${id}/shell`, { cmd });
-      showToast(`Shell-Befehl gesendet: ${cmd}`, 'success');
+      showToast(`Shell command sent: ${cmd}`, 'success');
       setShellInput((prev) => ({ ...prev, [id]: '' }));
     } catch (err) {
-      showToast(err.response?.data?.error || 'Shell-Befehl fehlgeschlagen', 'error');
+      showToast(err.response?.data?.error || 'Shell command failed', 'error');
     }
   };
 
@@ -148,7 +148,7 @@ export default function Players() {
 
       {players.length === 0 ? (
         <div className="card p-8 text-center text-gray-500">
-          Noch keine Player registriert. Verbinde einen Player um ihn hier zu sehen.
+          No players registered yet. Connect a player to see it here.
         </div>
       ) : (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
@@ -209,7 +209,7 @@ export default function Players() {
                     {isAdmin && (
                       <button
                         onClick={() => {
-                          if (confirm(`Player "${player.name || player.cpuSerialNumber}" wirklich löschen?`))
+                          if (confirm(`Really delete player "${player.name || player.cpuSerialNumber}"?`))
                             deletePlayer.mutate(player._id);
                         }}
                         className="p-1 text-gray-300 hover:text-red-500"
@@ -252,7 +252,7 @@ export default function Players() {
                     className="input text-sm w-full"
                   >
                     <option value="modern">Standby: Modern</option>
-                    <option value="testbild">Standby: Testbild</option>
+                    <option value="testbild">Standby: Test pattern</option>
                   </select>
 
                   {/* User Groups — nur Admin kann zuweisen */}
@@ -279,7 +279,7 @@ export default function Players() {
                           );
                         })}
                         {userGroups.length === 0 && (
-                          <span className="text-xs text-gray-400">Keine User Groups vorhanden</span>
+                          <span className="text-xs text-gray-400">No user groups available</span>
                         )}
                       </div>
                     </div>
@@ -314,7 +314,7 @@ export default function Players() {
                   {assetPicker === player._id && (
                     <div className="mb-2 border rounded-lg max-h-48 overflow-y-auto bg-white shadow-sm">
                       {allAssets.length === 0 ? (
-                        <div className="p-3 text-xs text-gray-400 text-center">Keine Assets</div>
+                        <div className="p-3 text-xs text-gray-400 text-center">No assets</div>
                       ) : (
                         allAssets.map((asset) => {
                           const Icon = typeIcons[asset.type] || FileText;
@@ -377,7 +377,7 @@ export default function Players() {
                     </div>
                   ) : (
                     <div className="text-xs text-gray-400 text-center py-2">
-                      Keine Direct Assets. Nutze den Schedule für zeitgesteuerte Inhalte.
+                      No direct assets. Use the Schedule for time-based content.
                     </div>
                   )}
                 </div>
@@ -403,9 +403,9 @@ export default function Players() {
                           onClick={async () => {
                             try {
                               await api.post(`/players/${player._id}/tv-power`, { on: !player.tvStatus });
-                              showToast(`TV ${!player.tvStatus ? 'an' : 'aus'} gesendet`, 'success');
+                              showToast(`TV ${!player.tvStatus ? 'on' : 'off'} sent`, 'success');
                             } catch (err) {
-                              showToast(err.response?.data?.error || 'TV-Befehl fehlgeschlagen', 'error');
+                              showToast(err.response?.data?.error || 'TV command failed', 'error');
                             }
                           }}
                           className="flex items-center gap-1 px-2 py-1 text-xs bg-gray-50 text-gray-600 rounded hover:bg-gray-100"

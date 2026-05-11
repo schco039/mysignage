@@ -27,7 +27,7 @@ export default function UserGroups() {
       setShowCreate(false);
       setNewName('');
     },
-    onError: (err) => alert(err.response?.data?.error || 'Fehler beim Erstellen'),
+    onError: (err) => alert(err.response?.data?.error || 'Error creating group'),
   });
 
   const updateGroup = useMutation({
@@ -61,7 +61,7 @@ export default function UserGroups() {
       <div className="flex items-center justify-between mb-6">
         <h2 className="page-title">User Groups</h2>
         <button onClick={() => setShowCreate(true)} className="flex items-center gap-2 btn-brand">
-          <Plus size={18} /> Neue Gruppe
+          <Plus size={18} /> New Group
         </button>
       </div>
 
@@ -78,17 +78,17 @@ export default function UserGroups() {
               type="text"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              placeholder="Gruppenname"
+              placeholder="Group name"
               className="flex-1 border rounded-lg px-3 py-2"
               required
             />
-            <button type="submit" className="btn-brand">Erstellen</button>
+            <button type="submit" className="btn-brand">Create</button>
             <button
               type="button"
               onClick={() => setShowCreate(false)}
               className="px-4 py-2 rounded-lg border hover:bg-gray-50"
             >
-              Abbrechen
+              Cancel
             </button>
           </form>
         </div>
@@ -104,7 +104,7 @@ export default function UserGroups() {
                   value={editData.name}
                   onChange={(e) => setEditData({ ...editData, name: e.target.value })}
                   className="font-semibold text-lg border rounded-lg px-3 py-1 flex-1 mr-3"
-                  placeholder="Gruppenname"
+                  placeholder="Group name"
                 />
               ) : (
                 <h3 className="font-semibold text-lg">{group.name}</h3>
@@ -135,7 +135,7 @@ export default function UserGroups() {
                     </button>
                     <button
                       onClick={() => {
-                        if (confirm('Diese User Group wirklich löschen?')) deleteGroup.mutate(group._id);
+                        if (confirm('Really delete this user group?')) deleteGroup.mutate(group._id);
                       }}
                       className="p-1.5 text-red-600 hover:bg-red-50 rounded"
                     >
@@ -149,7 +149,7 @@ export default function UserGroups() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Members */}
               <div>
-                <h4 className="text-sm font-medium text-gray-500 mb-2">Mitglieder</h4>
+                <h4 className="text-sm font-medium text-gray-500 mb-2">Members</h4>
                 {editingId === group._id ? (
                   <div className="space-y-1">
                     {users.map((user) => (
@@ -177,13 +177,13 @@ export default function UserGroups() {
                         </span>
                       ))
                     ) : (
-                      <span className="text-sm text-gray-400">Keine Mitglieder</span>
+                      <span className="text-sm text-gray-400">No members</span>
                     )}
                   </div>
                 )}
               </div>
 
-              {/* Players (read-only — Zuweisung via Players-Seite) */}
+              {/* Players (read-only — assignment via Players page) */}
               <div>
                 <h4 className="text-sm font-medium text-gray-500 mb-2 flex items-center gap-1">
                   <Tv size={14} /> Players
@@ -199,7 +199,7 @@ export default function UserGroups() {
                       </span>
                     ))
                   ) : (
-                    <span className="text-sm text-gray-400">Keine Players (zuweisen über die Players-Seite)</span>
+                    <span className="text-sm text-gray-400">No players (assign via Players page)</span>
                   )}
                 </div>
               </div>
@@ -211,12 +211,12 @@ export default function UserGroups() {
                 <Moon size={14} className="text-gray-400" />
                 {group.sleep?.enable ? (
                   <span className="text-gray-600">
-                    TV CEC aktiv: <span className="font-mono font-semibold">{group.sleep.ontime}</span>
+                    TV CEC active: <span className="font-mono font-semibold">{group.sleep.ontime}</span>
                     {' – '}
                     <span className="font-mono font-semibold">{group.sleep.offtime}</span>
                   </span>
                 ) : (
-                  <span className="text-gray-400">CEC Sleep deaktiviert</span>
+                  <span className="text-gray-400">CEC sleep disabled</span>
                 )}
               </div>
             )}
@@ -225,7 +225,7 @@ export default function UserGroups() {
             {editingId === group._id && (
               <div className="mt-4 pt-4 border-t">
                 <h4 className="text-sm font-medium text-gray-500 mb-2 flex items-center gap-1">
-                  <Moon size={14} /> TV Sleep-Zeiten
+                  <Moon size={14} /> TV sleep times
                 </h4>
                 <label className="flex items-center gap-2 text-sm mb-2">
                   <input
@@ -238,12 +238,12 @@ export default function UserGroups() {
                       })
                     }
                   />
-                  Sleep aktivieren (CEC)
+                  Enable sleep (CEC)
                 </label>
                 {editData.sleep?.enable && (
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">TV an ab (HH:MM)</label>
+                      <label className="block text-xs text-gray-500 mb-1">TV on from (HH:MM)</label>
                       <input
                         type="text"
                         inputMode="numeric"
@@ -257,7 +257,7 @@ export default function UserGroups() {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-500 mb-1">TV aus ab (HH:MM)</label>
+                      <label className="block text-xs text-gray-500 mb-1">TV off from (HH:MM)</label>
                       <input
                         type="text"
                         inputMode="numeric"
@@ -279,7 +279,7 @@ export default function UserGroups() {
 
         {groups.length === 0 && (
           <div className="card p-8 text-center text-gray-500">
-            Noch keine User Groups vorhanden.
+            No user groups yet.
           </div>
         )}
       </div>

@@ -58,7 +58,7 @@ export default function Assets() {
     // Validate all names
     for (const item of uploadModal) {
       if (!item.name.trim()) {
-        alert('Bitte alle Namen ausfüllen');
+        alert('Please fill in all names');
         return;
       }
     }
