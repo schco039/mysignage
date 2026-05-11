@@ -71,12 +71,18 @@ fi
 
 # ─── 2. Install Node.js 18 ───────────────────────────────
 if [ "$STEP" -lt 2 ]; then
-  echo "[2/7] Node.js ${NODE_VERSION} installieren..."
-  if ! command -v node &>/dev/null || [[ "$(node -v)" != v${NODE_VERSION}* ]]; then
-    curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash -
-    apt-get install -y -qq nodejs
+  echo "[2/7] Node.js + npm installieren..."
+  # Auf Pi OS Trixie hat nodesource evtl. noch keine offizielle Unterstützung
+  # → wenn das fehlschlägt, nimm Pi OS Default-Pakete (nodejs + npm separat)
+  if ! command -v node &>/dev/null; then
+    curl -fsSL "https://deb.nodesource.com/setup_${NODE_VERSION}.x" | bash - 2>/dev/null || true
+    apt-get install -y -qq nodejs || apt-get install -y -qq nodejs npm
   fi
-  echo "  Node.js $(node -v) installiert"
+  # npm sicher dazuziehen — Trixie hat es als separates Paket
+  if ! command -v npm &>/dev/null; then
+    apt-get install -y -qq npm
+  fi
+  echo "  Node.js $(node -v 2>/dev/null || echo '?') / npm $(npm -v 2>/dev/null || echo '?') installiert"
   set_progress 2
 fi
 
