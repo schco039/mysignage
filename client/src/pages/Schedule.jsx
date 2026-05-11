@@ -69,7 +69,16 @@ export default function Schedule() {
   });
 
   const updateSchedule = useMutation({
-    mutationFn: ({ id, schedule }) => api.put(`/playlists/${id}`, { schedule }),
+    mutationFn: async ({ id, schedule, targetPlayers }) => {
+      const body = { schedule };
+      if (targetPlayers !== undefined) body.targetPlayers = targetPlayers;
+      const res = await api.put(`/playlists/${id}`, body);
+      // Deploy an die (ggf. neuen) Player neu pushen
+      if (targetPlayers && targetPlayers.length > 0) {
+        try { await api.post('/playlists/deploy-players', { playerIds: targetPlayers }); } catch {}
+      }
+      return res.data;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['playlists'] });
       setModal(null);
@@ -270,7 +279,7 @@ export default function Schedule() {
         <EditScheduleModal
           playlist={modal.playlist}
           allPlayers={allPlayers}
-          onSave={(id, schedule) => updateSchedule.mutate({ id, schedule })}
+          onSave={(id, schedule, targetPlayers) => updateSchedule.mutate({ id, schedule, targetPlayers })}
           onDelete={(id) => deletePlaylist.mutate(id)}
           onClose={() => setModal(null)}
           isPending={updateSchedule.isPending}
@@ -663,11 +672,23 @@ function EditScheduleModal({ playlist, allPlayers, onSave, onDelete, onClose, is
   const [endTime, setEndTime] = useState(playlist?.schedule?.endTime || '');
   const [daysOfWeek, setDaysOfWeek] = useState(playlist?.schedule?.daysOfWeek || [0, 1, 2, 3, 4, 5, 6]);
 
-  const targetPlayerNames = (playlist?.targetPlayers || []).map((tp) => {
-    if (typeof tp === 'object') return tp.name || tp.cpuSerialNumber || 'Unnamed';
-    const p = allPlayers.find((pl) => pl._id === tp);
-    return p ? p.name || p.cpuSerialNumber : 'Unknown';
-  });
+  // Player aktuell zugeordnet (ID-Liste)
+  const initialPlayerIds = (playlist?.targetPlayers || []).map((tp) => (typeof tp === 'object' ? tp._id : tp));
+  const [selectedPlayerIds, setSelectedPlayerIds] = useState(initialPlayerIds);
+
+  // Sichtbare Player = die in der gleichen UserGroup wie die Playlist
+  const playlistGroupId = playlist?.userGroup?._id || playlist?.userGroup;
+  const visiblePlayers = playlistGroupId
+    ? allPlayers.filter((p) =>
+        (p.userGroups || []).some((ug) => (typeof ug === 'object' ? ug._id : ug) === playlistGroupId)
+      )
+    : allPlayers;
+
+  const togglePlayer = (id) => {
+    setSelectedPlayerIds((prev) =>
+      prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]
+    );
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -675,6 +696,7 @@ function EditScheduleModal({ playlist, allPlayers, onSave, onDelete, onClose, is
     const isoEnd = deToIso(endDate);
     if (startDate && !isoStart) { alert('Startdatum: TT.MM.JJJJ'); return; }
     if (endDate && !isoEnd) { alert('Enddatum: TT.MM.JJJJ'); return; }
+    if (selectedPlayerIds.length === 0) { alert('Mindestens einen Bildschirm auswählen'); return; }
     onSave(playlist._id, {
       enabled,
       startDate: isoStart || null,
@@ -682,7 +704,7 @@ function EditScheduleModal({ playlist, allPlayers, onSave, onDelete, onClose, is
       startTime: startTime || null,
       endTime: endTime || null,
       daysOfWeek,
-    });
+    }, selectedPlayerIds);
   };
 
   return (
@@ -693,13 +715,46 @@ function EditScheduleModal({ playlist, allPlayers, onSave, onDelete, onClose, is
             <h3 className="text-lg font-semibold">{assetName}</h3>
             <div className="text-xs text-gray-400">
               {playlist.userGroup?.name}
-              {targetPlayerNames.length > 0 && ` — ${targetPlayerNames.join(', ')}`}
+              {selectedPlayerIds.length > 0 && ` — ${selectedPlayerIds.length} Bildschirm(e)`}
             </div>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-4 space-y-4">
+        <form onSubmit={handleSubmit} className="p-4 space-y-4 max-h-[75vh] overflow-y-auto">
+          {/* Bildschirme zuordnen */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+              <Monitor size={11} className="inline mr-1" />Bildschirme
+            </label>
+            <div className="space-y-1 max-h-48 overflow-y-auto border rounded-lg p-1">
+              {visiblePlayers.length === 0 ? (
+                <div className="text-xs text-gray-400 text-center py-2">Keine Bildschirme verfügbar</div>
+              ) : (
+                visiblePlayers.map((player) => {
+                  const selected = selectedPlayerIds.includes(player._id);
+                  return (
+                    <label
+                      key={player._id}
+                      className={`flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer text-sm ${
+                        selected ? 'bg-brand-50' : 'hover:bg-gray-50'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        onChange={() => togglePlayer(player._id)}
+                        className="w-4 h-4 rounded border-gray-300 text-brand-600"
+                      />
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${player.isConnected ? 'bg-green-500' : 'bg-gray-300'}`} />
+                      <span className="truncate flex-1">{player.name || player.cpuSerialNumber || 'Unnamed'}</span>
+                    </label>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
           <label className="flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
