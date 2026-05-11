@@ -90,8 +90,9 @@ fi
 if [ "$STEP" -lt 3 ]; then
   echo "[3/7] Chromium installieren..."
   export DEBIAN_FRONTEND=noninteractive
-  # unclutter (X11) + unclutter-xfixes (XFixes) + xdotool (Fallback) für Cursor-Hiding
-  apt-get install -y -qq chromium unclutter unclutter-xfixes xdotool || true
+  # unclutter (X11) + unclutter-xfixes (XFixes) + xdotool (Cursor-Hiding)
+  # wlr-randr für HDMI-Output-Steuerung auf Wayland/labwc
+  apt-get install -y -qq chromium unclutter unclutter-xfixes xdotool wlr-randr || true
   echo "  Chromium installiert"
   set_progress 3
 fi

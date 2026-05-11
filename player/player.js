@@ -304,15 +304,27 @@ function connectToServer() {
       } catch (err) {
         console.warn('[Player] CEC command failed:', err.message);
       }
-      // 2. HDMI-Output am Pi auch (de)aktivieren — verhindert dass der TV
-      //    durch HDMI-Signal-Änderungen (Video-Wechsel) wieder aufwacht
+      // 2. HDMI-Output am Pi (de)aktivieren — verhindert Auto-Wake durch HDMI-Signal.
+      //    Mehrere Methoden weil je nach Pi OS / Display-Stack unterschiedlich:
+      //    - wlr-randr (Wayland / labwc) — modernste Methode
+      //    - vcgencmd (Pi-Firmware, auf Trixie/Wayland teils deprecated)
+      //    - tvservice (alte Pi-Methode)
+      const hdmiOn = on;
+      // Methode 1: wlr-randr für alle Outputs
       try {
-        execSync(`vcgencmd display_power ${on ? 1 : 0}`, { timeout: 5000 });
-      } catch (err) {
-        // vcgencmd nicht verfügbar oder Pi 5 nutzt andere API — egal
-      }
+        const out = execSync('wlr-randr 2>/dev/null', { encoding: 'utf8', timeout: 3000, env: { ...process.env, WAYLAND_DISPLAY: 'wayland-0', XDG_RUNTIME_DIR: '/run/user/1000' } });
+        const outputs = out.split('\n').filter(l => /^\S/.test(l) && !/^Adaptive/.test(l)).map(l => l.split(' ')[0]).filter(Boolean);
+        for (const o of outputs) {
+          execSync(`wlr-randr --output ${o} --${hdmiOn ? 'on' : 'off'}`, { timeout: 3000, env: { ...process.env, WAYLAND_DISPLAY: 'wayland-0', XDG_RUNTIME_DIR: '/run/user/1000' } });
+        }
+      } catch {}
+      // Methode 2: vcgencmd
+      try { execSync(`vcgencmd display_power ${hdmiOn ? 1 : 0}`, { timeout: 3000 }); } catch {}
+      // Methode 3: tvservice (legacy)
+      try { execSync(hdmiOn ? 'tvservice -p' : 'tvservice -o', { timeout: 3000 }); } catch {}
+
       tvStatus = on;
-      console.log(`[Player] TV power: ${tvStatus ? 'on' : 'off'} (HDMI ${on ? 'on' : 'off'})`);
+      console.log(`[Player] TV power: ${tvStatus ? 'on' : 'off'} (HDMI ${hdmiOn ? 'on' : 'off'})`);
       if (socket.connected) sendStatus(socket);
     }
   });
