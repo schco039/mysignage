@@ -1,50 +1,62 @@
 const UserGroup = require('../models/UserGroup');
 const Player = require('../models/Player');
-const { deployForPlayer, deployForUserGroup } = require('./deploy.service');
+const { deployForUserGroup } = require('./deploy.service');
 const { emitToPlayer } = require('../socket/emitter');
 const { log } = require('./log.service');
 
-const INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+// Zwei separate Intervalle:
+// - Schedule-Re-Deploy ist teurer (DB-Queries + file sync) → alle 5 Min
+// - CEC-Sleep-Check ist nur ein Socket-Emit → jede Minute für präzises Timing
+const DEPLOY_INTERVAL_MS = 5 * 60 * 1000;
+const CEC_INTERVAL_MS = 60 * 1000;
 
-let timer = null;
+let deployTimer = null;
+let cecTimer = null;
 
 function start(ioInstances) {
-  console.log('Cron service started (every 5 min)');
-  run(ioInstances);
-  timer = setInterval(() => run(ioInstances), INTERVAL_MS);
+  console.log('Cron service started (deploy: 5 min, CEC: 1 min)');
+  runDeploy(ioInstances);
+  runCec(ioInstances);
+  deployTimer = setInterval(() => runDeploy(ioInstances), DEPLOY_INTERVAL_MS);
+  cecTimer = setInterval(() => runCec(ioInstances), CEC_INTERVAL_MS);
 }
 
 function stop() {
-  if (timer) {
-    clearInterval(timer);
-    timer = null;
-  }
+  if (deployTimer) clearInterval(deployTimer);
+  if (cecTimer) clearInterval(cecTimer);
+  deployTimer = null;
+  cecTimer = null;
 }
 
-async function run(ioInstances) {
+async function runDeploy(ioInstances) {
   try {
     const io = ioInstances.io;
     const groups = await UserGroup.find();
-
     for (const group of groups) {
-      // 1. Re-deploy (prüft Schedule + Validity)
       try {
         await deployForUserGroup(group._id, io);
       } catch (err) {
         console.error(`Cron deploy error for group ${group.name}:`, err.message);
       }
+    }
+  } catch (err) {
+    console.error('Cron deploy run error:', err.message);
+  }
+}
 
-      // 2. Sleep/CEC Zeiten prüfen
-      if (group.sleep?.enable && group.sleep.ontime && group.sleep.offtime) {
-        try {
-          await checkSleep(ioInstances, group);
-        } catch (err) {
-          console.error(`Cron sleep error for group ${group.name}:`, err.message);
-        }
+async function runCec(ioInstances) {
+  try {
+    const groups = await UserGroup.find({ 'sleep.enable': true });
+    for (const group of groups) {
+      if (!group.sleep?.ontime || !group.sleep?.offtime) continue;
+      try {
+        await checkSleep(ioInstances, group);
+      } catch (err) {
+        console.error(`Cron sleep error for group ${group.name}:`, err.message);
       }
     }
   } catch (err) {
-    console.error('Cron run error:', err.message);
+    console.error('Cron CEC run error:', err.message);
   }
 }
 
@@ -69,9 +81,8 @@ async function checkSleep(ioInstances, group) {
     isConnected: true,
   });
 
-  // CEC-Commands sind idempotent — wir senden immer den gewünschten State.
-  // Das stellt sicher dass der Schedule auch dann durchgesetzt wird
-  // wenn z.B. jemand mit der Fernbedienung den TV manuell anschaltet.
+  // CEC-Commands sind idempotent — immer gewünschten State senden.
+  // Logging nur bei State-Wechsel um Spam zu vermeiden.
   for (const player of players) {
     await emitToPlayer(ioInstances, player._id, 'cmd', {
       cmd: 'tvpower',
