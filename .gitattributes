@@ -1,0 +1,5 @@
+# Shell-Scripts laufen auf Linux (Server, Pi, NUC) — CRLF bricht den Shebang
+*.sh text eol=lf
+
+# Windows-Batch braucht CRLF
+*.bat text eol=crlf

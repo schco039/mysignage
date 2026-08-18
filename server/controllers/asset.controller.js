@@ -45,13 +45,6 @@ exports.get = async (req, res) => {
       .populate('displayGroups', 'name');
     if (!asset) return res.status(404).json({ error: 'Asset not found' });
 
-    if (
-      req.allowedDisplayGroups &&
-      !asset.displayGroups.some((dg) => req.allowedDisplayGroups.includes(dg._id.toString()))
-    ) {
-      return res.status(403).json({ error: 'No access to this asset' });
-    }
-
     res.json(asset);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -113,13 +106,6 @@ exports.update = async (req, res) => {
   try {
     const asset = await Asset.findById(req.params.id);
     if (!asset) return res.status(404).json({ error: 'Asset not found' });
-
-    if (
-      req.allowedDisplayGroups &&
-      !asset.displayGroups.some((dg) => req.allowedDisplayGroups.includes(dg.toString()))
-    ) {
-      return res.status(403).json({ error: 'No access to this asset' });
-    }
 
     const { validity, labels, displayGroups, duration } = req.body;
     if (validity !== undefined) asset.validity = validity;

@@ -24,20 +24,4 @@ async function emitToPlayer(ioInstances, playerId, event, data) {
   return true;
 }
 
-/**
- * Emit to all connected players in a display group.
- */
-async function emitToDisplayGroup(ioInstances, displayGroupId, event, data) {
-  const players = await Player.find({
-    'displayGroup._id': displayGroupId,
-    isConnected: true,
-  });
-
-  for (const player of players) {
-    if (player.socket) {
-      await emitToPlayer(ioInstances, player._id, event, data);
-    }
-  }
-}
-
-module.exports = { emitToPlayer, emitToDisplayGroup };
+module.exports = { emitToPlayer };

@@ -5,7 +5,12 @@ module.exports = {
   port: parseInt(process.env.PORT, 10) || 3001,
   httpsPort: parseInt(process.env.HTTPS_PORT, 10) || 3443,
   certDir: process.env.CERT_DIR || path.resolve(__dirname, '..', '..', 'certs'),
-  mongoUri: process.env.MONGO_URI || 'mongodb://localhost:27017/mysignage',
+  // MONGODB_URI wird von server-install.sh geschrieben, MONGO_URI ist der
+  // historische Name — beide akzeptieren, damit bestehende .env-Dateien laufen.
+  mongoUri:
+    process.env.MONGO_URI ||
+    process.env.MONGODB_URI ||
+    'mongodb://localhost:27017/mysignage',
   jwtSecret: process.env.JWT_SECRET || 'change-this',
   jwtExpiresIn: '7d',
   syncDir: path.resolve(__dirname, '..', process.env.SYNC_DIR || './data/sync_folders'),
