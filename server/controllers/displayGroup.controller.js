@@ -5,12 +5,9 @@ const config = require('../config');
 
 exports.list = async (req, res) => {
   try {
-    let query = {};
-    // Editors only see their allowed display groups
-    if (req.allowedDisplayGroups) {
-      query._id = { $in: req.allowedDisplayGroups };
-    }
-    const groups = await DisplayGroup.find(query).select('-deployedAssets');
+    // Hier kommen nur Admins an: rbac('DisplayGroup', ...) weist alle
+    // anderen vorher mit 403 ab.
+    const groups = await DisplayGroup.find().select('-deployedAssets');
     res.json(groups);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -21,11 +18,6 @@ exports.get = async (req, res) => {
   try {
     const group = await DisplayGroup.findById(req.params.id);
     if (!group) return res.status(404).json({ error: 'DisplayGroup not found' });
-
-    // Scope check for editors
-    if (req.allowedDisplayGroups && !req.allowedDisplayGroups.includes(group._id.toString())) {
-      return res.status(403).json({ error: 'No access to this display group' });
-    }
 
     res.json(group);
   } catch (err) {
@@ -57,10 +49,6 @@ exports.update = async (req, res) => {
   try {
     const group = await DisplayGroup.findById(req.params.id);
     if (!group) return res.status(404).json({ error: 'DisplayGroup not found' });
-
-    if (req.allowedDisplayGroups && !req.allowedDisplayGroups.includes(group._id.toString())) {
-      return res.status(403).json({ error: 'No access to this display group' });
-    }
 
     // Don't allow changing name (it's the sync folder name)
     const { name, ...updateFields } = req.body;
