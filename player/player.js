@@ -37,21 +37,46 @@ fs.mkdirSync(MEDIA_DIR, { recursive: true });
 
 // ─── Player Identity ─────────────────────────────────────
 function getCpuSerial() {
+  // Raspberry Pi: Hardware-Serial aus /proc/cpuinfo.
+  // MUSS an erster Stelle bleiben — bestehende Player sind unter dieser ID
+  // in der Datenbank registriert. Eine Änderung der Reihenfolge würde sie
+  // alle als neue Player auftauchen lassen (ohne UserGroups und Playlists).
   try {
     const cpuinfo = fs.readFileSync('/proc/cpuinfo', 'utf8');
     const match = cpuinfo.match(/Serial\s*:\s*(\w+)/);
     if (match) return match[1];
   } catch {}
-  // Fallback: use MAC address hash
+
+  // x86 (Intel NUC & Co) hat kein CPU-Serial. machine-id wird bei der
+  // OS-Installation einmalig erzeugt und bleibt danach stabil — anders als
+  // die MAC-Adresse, die bei mehreren NICs nicht deterministisch ist.
+  for (const file of ['/etc/machine-id', '/var/lib/dbus/machine-id']) {
+    try {
+      const id = fs.readFileSync(file, 'utf8').trim();
+      if (id) return id;
+    } catch {}
+  }
+
+  // Letzter Ausweg: MAC-Adresse. Nach Interface-Name sortiert, damit bei
+  // LAN+WLAN wenigstens immer dieselbe gewählt wird.
   const nets = os.networkInterfaces();
-  for (const iface of Object.values(nets)) {
-    for (const net of iface) {
+  for (const name of Object.keys(nets).sort()) {
+    for (const net of nets[name]) {
       if (!net.internal && net.mac !== '00:00:00:00:00:00') {
         return net.mac.replace(/:/g, '');
       }
     }
   }
+
   return 'unknown-' + Date.now();
+}
+
+function isRaspberryPi() {
+  try {
+    return /Raspberry Pi/i.test(fs.readFileSync('/proc/device-tree/model', 'utf8'));
+  } catch {
+    return false;
+  }
 }
 
 function getMacAddresses() {
@@ -88,56 +113,165 @@ function getDiskSpace() {
 }
 
 function getCpuTemp() {
+  // Auf dem Pi ist thermal_zone0 die CPU. Auf Intel ist das oft die
+  // ACPI-Zone (Gehäuse/Board) oder fehlt ganz — der CPU-Wert hängt dort
+  // am coretemp-hwmon. Deshalb zuerst hwmon, dann thermal_zone als Fallback.
+  const HWMON_CPU = ['coretemp', 'k10temp', 'cpu_thermal', 'zenpower'];
+  try {
+    const base = '/sys/class/hwmon';
+    for (const dir of fs.readdirSync(base)) {
+      try {
+        const name = fs.readFileSync(path.join(base, dir, 'name'), 'utf8').trim();
+        if (!HWMON_CPU.includes(name)) continue;
+        const temp = fs.readFileSync(path.join(base, dir, 'temp1_input'), 'utf8');
+        return (parseInt(temp, 10) / 1000).toFixed(1) + "'C";
+      } catch {}
+    }
+  } catch {}
+
   try {
     const temp = fs.readFileSync('/sys/class/thermal/thermal_zone0/temp', 'utf8');
-    return (parseInt(temp) / 1000).toFixed(1) + "'C";
-  } catch {
-    return '?';
-  }
+    return (parseInt(temp, 10) / 1000).toFixed(1) + "'C";
+  } catch {}
+
+  return '?';
 }
 
-// ─── HDMI-Output an/aus für CEC-Sleep ─────────────────────
-// Pi OS Trixie/Wayland: vcgencmd ist deprecated → wlr-randr/wlopm nutzen.
-// Service läuft als pi-User aber kennt das Wayland-Socket nicht von selbst.
-function setHdmiPower(on) {
+// ─── Display-Power (TV Sleep) ────────────────────────
+// Der TV wird nicht per CEC geschaltet, sondern über das HDMI-Signal:
+//   Signal weg  -> TV geht nach kurzer Zeit selbst in Standby
+//   Signal da   -> TV wacht per HDMI-Auto-Wake wieder auf
+// CEC bewusst NICHT: libcec announciert den Player beim Öffnen als Gerät
+// und weckt den TV damit sofort wieder auf (Sharp-Problem).
+//
+// Welche Methode funktioniert, hängt am Grafik-Stack, nicht an der CPU:
+//   wlroots (labwc/sway  - Pi OS und NUC mit labwc) -> wlopm / wlr-randr
+//   X11 (klassischer Desktop)                       -> xset dpms
+//   Raspberry Pi Legacy-Firmware                    -> vcgencmd
+
+// Merkt sich die zuletzt erfolgreiche Methode, damit nicht bei jedem
+// Schaltvorgang die komplette Kette durchprobiert wird.
+let displayMethod = null;
+
+function waylandEnv() {
   const uid = process.getuid ? process.getuid() : 1000;
-  const xdgRuntimeDir = `/run/user/${uid}`;
+  const xdgRuntimeDir = process.env.XDG_RUNTIME_DIR || `/run/user/${uid}`;
 
-  // Wayland-Socket finden (wayland-0, wayland-1, ...)
-  let waylandDisplay = 'wayland-0';
-  try {
-    const sockets = fs.readdirSync(xdgRuntimeDir).filter((f) => /^wayland-\d+$/.test(f));
-    if (sockets[0]) waylandDisplay = sockets[0];
-  } catch {}
+  // Der systemd-Service kennt das Wayland-Socket nicht von selbst.
+  let waylandDisplay = process.env.WAYLAND_DISPLAY;
+  if (!waylandDisplay) {
+    try {
+      const sockets = fs
+        .readdirSync(xdgRuntimeDir)
+        .filter((f) => /^wayland-\d+$/.test(f))
+        .sort();
+      waylandDisplay = sockets[0];
+    } catch {}
+  }
+  if (!waylandDisplay) return null;
 
-  const env = {
-    ...process.env,
-    WAYLAND_DISPLAY: waylandDisplay,
-    XDG_RUNTIME_DIR: xdgRuntimeDir,
-  };
+  return { ...process.env, WAYLAND_DISPLAY: waylandDisplay, XDG_RUNTIME_DIR: xdgRuntimeDir };
+}
 
-  // Methode 1: wlopm (einfachste Wayland-Methode)
-  try {
-    execSync(`wlopm --${on ? 'on' : 'off'} '*'`, { timeout: 3000, env });
-    return;
-  } catch {}
+function x11Env() {
+  const display = process.env.DISPLAY || ':0';
+  const env = { ...process.env, DISPLAY: display };
 
-  // Methode 2: wlr-randr für jeden Output
-  try {
-    const out = execSync('wlr-randr', { encoding: 'utf8', timeout: 3000, env });
-    const outputs = out
-      .split('\n')
-      .filter((l) => /^[A-Z]/.test(l))
-      .map((l) => l.split(' ')[0])
-      .filter(Boolean);
-    for (const o of outputs) {
-      try { execSync(`wlr-randr --output ${o} --${on ? 'on' : 'off'}`, { timeout: 3000, env }); } catch {}
+  // xset braucht die Xauthority des Session-Users
+  if (!env.XAUTHORITY) {
+    for (const candidate of [
+      path.join(os.homedir(), '.Xauthority'),
+      `/run/user/${process.getuid ? process.getuid() : 1000}/gdm/Xauthority`,
+    ]) {
+      if (fs.existsSync(candidate)) {
+        env.XAUTHORITY = candidate;
+        break;
+      }
     }
-    return;
-  } catch {}
+  }
+  return env;
+}
 
-  // Methode 3: vcgencmd (Pi-Firmware Legacy)
-  try { execSync(`vcgencmd display_power ${on ? 1 : 0}`, { timeout: 3000 }); } catch {}
+// Jede Methode gibt true zurück wenn sie tatsächlich geschaltet hat,
+// false wenn sie auf diesem System nicht anwendbar ist. Wirft sie, gilt
+// sie als fehlgeschlagen und die nächste wird probiert.
+const DISPLAY_METHODS = [
+  {
+    name: 'wlopm',
+    run: (on) => {
+      const env = waylandEnv();
+      if (!env) return false;
+      execSync(`wlopm --${on ? 'on' : 'off'} '*'`, { timeout: 5000, env, stdio: 'ignore' });
+      return true;
+    },
+  },
+  {
+    name: 'wlr-randr',
+    run: (on) => {
+      const env = waylandEnv();
+      if (!env) return false;
+      // Output-Namen stehen nicht eingerückt am Zeilenanfang (HDMI-A-1, eDP-1, ...),
+      // ihre Eigenschaften sind eingerückt.
+      const out = execSync('wlr-randr', { encoding: 'utf8', timeout: 5000, env });
+      const outputs = out
+        .split(/\r?\n/)
+        .filter((l) => /^\S/.test(l))
+        .map((l) => l.split(' ')[0])
+        .filter(Boolean);
+      if (outputs.length === 0) return false;
+      for (const o of outputs) {
+        execSync(`wlr-randr --output ${o} --${on ? 'on' : 'off'}`, { timeout: 5000, env });
+      }
+      return true;
+    },
+  },
+  {
+    name: 'xset',
+    run: (on) => {
+      const env = x11Env();
+      // Ohne aktiviertes DPMS ignoriert der X-Server "force off" stillschweigend.
+      execSync('xset +dpms', { timeout: 5000, env, stdio: 'ignore' });
+      execSync(`xset dpms force ${on ? 'on' : 'off'}`, { timeout: 5000, env, stdio: 'ignore' });
+      return true;
+    },
+  },
+  {
+    name: 'vcgencmd',
+    run: (on) => {
+      if (!isRaspberryPi()) return false;
+      execSync(`vcgencmd display_power ${on ? 1 : 0}`, { timeout: 5000, stdio: 'ignore' });
+      return true;
+    },
+  },
+];
+
+function setHdmiPower(on) {
+  // Zuletzt erfolgreiche Methode zuerst, danach der Rest als Fallback.
+  const ordered = displayMethod
+    ? [displayMethod, ...DISPLAY_METHODS.filter((m) => m !== displayMethod)]
+    : DISPLAY_METHODS;
+
+  for (const method of ordered) {
+    try {
+      if (!method.run(on)) continue;
+      if (displayMethod !== method) {
+        console.log(`[Player] Display-Power via ${method.name}`);
+        displayMethod = method;
+      }
+      return true;
+    } catch {
+      // Methode nicht verfügbar oder fehlgeschlagen -> nächste probieren
+    }
+  }
+
+  // Früher ist das still fehlgeschlagen — auf x86 hat schlicht nie etwas
+  // geschaltet, ohne dass es jemand gemerkt haette.
+  displayMethod = null;
+  console.error(
+    `[Player] Display konnte nicht ${on ? 'eingeschaltet' : 'ausgeschaltet'} werden — ` +
+      'keine der Methoden (wlopm, wlr-randr, xset, vcgencmd) war anwendbar.'
+  );
+  return false;
 }
 
 const cpuSerialNumber = getCpuSerial();

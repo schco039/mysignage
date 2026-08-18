@@ -79,6 +79,48 @@ Nach dem automatischen Neustart erscheint der Player im Dashboard und zeigt den 
 
 ---
 
+---
+
+## Intel NUC / x86-PC als Player installieren
+
+Alternative zum Raspberry Pi — gleiche Software, gleiche Bedienung.
+
+### Schritt 1 — Debian installieren
+
+**Debian 12 oder 13** vom USB-Stick installieren. Bei der Software-Auswahl:
+
+- **Keine** Desktop-Umgebung ankreuzen
+- **SSH-Server** und **Standard-Systemwerkzeuge** ankreuzen
+
+Das Setup-Script installiert die Wayland-Session (labwc) selbst. Eine
+mitinstallierte Desktop-Umgebung wie GNOME wuerde damit kollidieren.
+
+### Schritt 2 — Setup-Script ausfuehren
+
+SSH auf den NUC, dann:
+
+```bash
+curl -sSL http://<server>:3001/setup.sh | sudo bash -s http://<server>:3001
+```
+
+Das Script erkennt die Plattform automatisch und installiert den x86-Zweig:
+labwc, lightdm, Chromium und den Player-Service. Nach dem Neustart erscheint
+der NUC im Dashboard wie ein Pi.
+
+### Unterschiede zum Pi
+
+| | Raspberry Pi | Intel NUC |
+|---|---|---|
+| Player-ID | CPU-Serial aus `/proc/cpuinfo` | `/etc/machine-id` |
+| TV-Sleep | `wlopm` über labwc | identisch (labwc wird mitinstalliert) |
+| CEC | nicht genutzt | nicht verfügbar |
+| Boot-Tuning | `gpu_mem`, Bluetooth aus, Swap aus | entfällt |
+| Installation | SD-Karte vorbereiten oder SSH | nur SSH |
+
+> **TV-Sleep prüfen:** Nach der Installation testen, ob der Bildschirm zur
+> eingestellten Zeit ausgeht. Falls nicht, zeigt `journalctl -u mysignage-player`
+> welche Methode gegriffen hat — der Player loggt sie beim ersten Schaltvorgang.
+
 ## Manuelle Pi-Installation (ohne SD-Karte vorbereiten)
 
 SSH auf den Pi, dann:

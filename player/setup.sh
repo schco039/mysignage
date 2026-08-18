@@ -2,13 +2,20 @@
 # ─────────────────────────────────────────────────────────
 # mySignage Player Setup Script
 #
-# Macht ein frisches Raspberry Pi OS zum Signage-Player.
+# Macht ein frisches Linux zum Signage-Player. Unterstuetzt:
+#   - Raspberry Pi OS (Desktop, 64-bit) auf RPi 4/5
+#   - Debian 12/13 ohne Desktop auf x86 (Intel NUC & Co)
 #
-# Nutzung (manuell):
+# Die Plattform wird automatisch erkannt ($PLATFORM). Auf x86 installiert
+# das Script labwc als Wayland-Session — denselben wlroots-Compositor wie
+# Pi OS. Dadurch funktioniert die TV-Sleep-Steuerung (wlopm/wlr-randr) auf
+# beiden Plattformen mit identischem Code.
+#
+# Nutzung (manuell, beide Plattformen):
 #   curl -sSL http://<server>:3001/setup.sh | sudo bash -s http://<server>:3001
 #
-# Oder via cloud-init: prepare-sd.bat erstellt eine Config-Datei,
-# firstboot.sh liest sie und ruft dieses Script mit der URL auf.
+# Auf dem Pi zusaetzlich via cloud-init: prepare-sd.bat erstellt eine
+# Config-Datei, firstboot.sh liest sie und ruft dieses Script mit der URL auf.
 # ─────────────────────────────────────────────────────────
 
 # Server-URL: Argument > Config-Datei > Fehler (CRLF-tolerant)
@@ -32,6 +39,16 @@ fi
 TARGET_HOME=$(getent passwd "$TARGET_USER" | cut -d: -f6)
 TARGET_GROUP=$(id -gn "$TARGET_USER")
 echo "  Ziel-User: $TARGET_USER ($TARGET_HOME)"
+
+# Plattform bestimmen. Entscheidend ist nicht die CPU-Architektur, sondern
+# was das OS mitbringt: Pi OS hat labwc, lightdm und die Firmware-Configs
+# bereits an Bord, ein nacktes x86-Debian nicht.
+if grep -qi "raspberry pi" /proc/device-tree/model 2>/dev/null; then
+  PLATFORM="pi"
+else
+  PLATFORM="x86"
+fi
+echo "  Plattform: $PLATFORM ($(uname -m))"
 
 INSTALL_DIR="$TARGET_HOME/mysignage"
 NODE_VERSION="18"
@@ -88,20 +105,38 @@ fi
 
 # ─── 3. Install Chromium + dependencies ──────────────────
 if [ "$STEP" -lt 3 ]; then
-  echo "[3/7] Chromium installieren..."
+  echo "[3/7] Chromium + Desktop-Umgebung installieren..."
   export DEBIAN_FRONTEND=noninteractive
-  # unclutter (X11) + unclutter-xfixes (XFixes) + xdotool (Cursor-Hiding)
-  # wlr-randr für HDMI-Output-Steuerung auf Wayland/labwc
-  apt-get install -y -qq chromium unclutter unclutter-xfixes xdotool wlr-randr || true
-  echo "  Chromium installiert"
+
+  # Gemeinsam: Browser + Cursor-Hiding + HDMI-Output-Steuerung.
+  # wlopm ist der primaere Weg fuer TV-Sleep, wlr-randr der Fallback.
+  COMMON_PKGS="chromium unclutter unclutter-xfixes xdotool wlr-randr wlopm"
+
+  if [ "$PLATFORM" = "pi" ]; then
+    # Pi OS bringt labwc und lightdm bereits mit
+    apt-get install -y -qq $COMMON_PKGS || true
+  else
+    # x86-Debian: Wayland-Session und Display-Manager fehlen komplett.
+    # labwc ist derselbe wlroots-Compositor wie auf Pi OS — damit laeuft
+    # der Player-Code (wlopm/wlr-randr) hier unveraendert.
+    apt-get install -y -qq $COMMON_PKGS labwc xwayland seatd lightdm || true
+  fi
+  echo "  Pakete installiert"
   set_progress 3
 fi
 
 # ─── 4. Install CEC tools (TV control) ───────────────────
 if [ "$STEP" -lt 4 ]; then
   echo "[4/7] CEC-Tools installieren..."
-  apt-get install -y -qq cec-utils || true
-  echo "  CEC-Tools installiert"
+  # Nur auf dem Pi: x86-Boards haben keinen CEC-faehigen HDMI-Ausgang.
+  # (Wird vom Player aktuell nicht genutzt — TV-Power laeuft ueber das
+  # HDMI-Signal, siehe setHdmiPower() in player.js.)
+  if [ "$PLATFORM" = "pi" ]; then
+    apt-get install -y -qq cec-utils || true
+    echo "  CEC-Tools installiert"
+  else
+    echo "  uebersprungen (kein CEC auf x86)"
+  fi
   set_progress 4
 fi
 
@@ -261,15 +296,22 @@ EOF2
   fi
   echo "  Autologin-Session: ${AUTOLOGIN_SESSION:-(none)}"
 
-  # Pi OS Trixie referenziert "rpd-labwc" in /etc/lightdm/lightdm.conf,
-  # das Desktop-File fehlt aber → Symlink anlegen damit lightdm es findet
-  if [ -f /usr/share/wayland-sessions/labwc.desktop ] && [ ! -e /usr/share/wayland-sessions/rpd-labwc.desktop ]; then
-    ln -sf /usr/share/wayland-sessions/labwc.desktop /usr/share/wayland-sessions/rpd-labwc.desktop
-    echo "  Symlink rpd-labwc → labwc angelegt"
-  fi
+  if [ "$PLATFORM" = "pi" ]; then
+    # Pi OS Trixie referenziert "rpd-labwc" in /etc/lightdm/lightdm.conf,
+    # das Desktop-File fehlt aber → Symlink anlegen damit lightdm es findet
+    if [ -f /usr/share/wayland-sessions/labwc.desktop ] && [ ! -e /usr/share/wayland-sessions/rpd-labwc.desktop ]; then
+      ln -sf /usr/share/wayland-sessions/labwc.desktop /usr/share/wayland-sessions/rpd-labwc.desktop
+      echo "  Symlink rpd-labwc → labwc angelegt"
+    fi
 
-  # Versuch 1: raspi-config
-  raspi-config nonint do_boot_behaviour B4 2>/dev/null || true
+    # Versuch 1: raspi-config (gibt es nur auf Pi OS)
+    raspi-config nonint do_boot_behaviour B4 2>/dev/null || true
+  else
+    # x86-Debian bootet per Default nach multi-user.target — ohne das hier
+    # startet nie eine grafische Session und der Kiosk bleibt schwarz.
+    systemctl set-default graphical.target 2>/dev/null || true
+    systemctl enable lightdm 2>/dev/null || true
+  fi
 
   # Versuch 2: lightdm direkt konfigurieren (mit Session)
   if [ -d /etc/lightdm ]; then
@@ -311,22 +353,27 @@ fi
 if [ "$STEP" -lt 7 ]; then
   echo "[7/7] System optimieren..."
 
-  # Find the correct config.txt path (newer Pi OS uses /boot/firmware/)
-  BOOT_CONFIG="/boot/config.txt"
-  [ -f /boot/firmware/config.txt ] && BOOT_CONFIG="/boot/firmware/config.txt"
+  # ── Nur Pi: Firmware-Config und SD-Karten-Schonung ──
+  if [ "$PLATFORM" = "pi" ]; then
+    # Find the correct config.txt path (newer Pi OS uses /boot/firmware/)
+    BOOT_CONFIG="/boot/config.txt"
+    [ -f /boot/firmware/config.txt ] && BOOT_CONFIG="/boot/firmware/config.txt"
 
-  # Increase GPU memory for video playback
-  if ! grep -q "gpu_mem" "$BOOT_CONFIG" 2>/dev/null; then
-    echo "gpu_mem=256" >> "$BOOT_CONFIG"
+    # Increase GPU memory for video playback
+    if ! grep -q "gpu_mem" "$BOOT_CONFIG" 2>/dev/null; then
+      echo "gpu_mem=256" >> "$BOOT_CONFIG"
+    fi
+
+    # Disable Bluetooth (saves power, reduces interference)
+    if ! grep -q "dtoverlay=disable-bt" "$BOOT_CONFIG" 2>/dev/null; then
+      echo "dtoverlay=disable-bt" >> "$BOOT_CONFIG"
+    fi
+
+    # Disable swap (extend SD card life)
+    systemctl disable dphys-swapfile 2>/dev/null || true
   fi
-
-  # Disable Bluetooth (saves power, reduces interference)
-  if ! grep -q "dtoverlay=disable-bt" "$BOOT_CONFIG" 2>/dev/null; then
-    echo "dtoverlay=disable-bt" >> "$BOOT_CONFIG"
-  fi
-
-  # Disable swap (extend SD card life)
-  systemctl disable dphys-swapfile 2>/dev/null || true
+  # Auf x86 entfaellt das alles: kein config.txt, GPU-Speicher wird dynamisch
+  # vergeben, und die SSD braucht keine Swap-Schonung.
 
   # Set timezone
   timedatectl set-timezone Europe/Vienna 2>/dev/null || true
@@ -343,7 +390,11 @@ if [ "$STEP" -lt 7 ]; then
   systemctl mask apt-daily-upgrade.timer 2>/dev/null || true
 
   # Remove update notifier / welcome wizard if installed
-  apt-get remove -y update-notifier rpd-plym-splash piwiz 2>/dev/null || true
+  # (rpd-plym-splash und piwiz gibt es nur auf Pi OS)
+  apt-get remove -y update-notifier 2>/dev/null || true
+  if [ "$PLATFORM" = "pi" ]; then
+    apt-get remove -y rpd-plym-splash piwiz 2>/dev/null || true
+  fi
 
   # Disable lxplug-updater (LXDE panel update plugin)
   rm -f /etc/xdg/autostart/lxplug-updater.desktop 2>/dev/null || true
